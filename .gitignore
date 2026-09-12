@@ -1,0 +1,28 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.moved-aside
+Timeline.xcuserdatad/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# CI / tooling
+coverage/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# macOS
+.DS_Store
+
+# Secrets — never commit credentials even by accident
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+.env
