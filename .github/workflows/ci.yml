@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SCHEME: WineVault
+  DESTINATION: "platform=iOS Simulator,name=iPhone 17,OS=latest"
+
+jobs:
+  # Domain-layer warnings-as-errors baseline gate. Runs on any Linux
+  # runner — deterministic and fast, no Xcode needed.
+  domain-package:
+    name: Domain package (warnings-as-errors)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate project.yml
+        run: bash Scripts/validate_project_yml.sh
+
+      - name: Build + test WineVaultDomain (all warnings are errors)
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" -w /src/Packages/WineVaultDomain \
+            swift:6.1 \
+            swift test -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
+
+  lint:
+    name: SwiftLint
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: Lint Domain layer (strict — warnings fail the build)
+        run: swiftlint --strict --config .swiftlint.yml Packages/WineVaultDomain
+      - name: Lint app sources (non-blocking baseline)
+        run: swiftlint --config .swiftlint.yml WineVault WineVaultTests
+
+  # iOS 26 SDK build + test gate — macOS runner with Xcode 26.
+  build-test:
+    name: Build + test (iOS 26 simulator)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode 26 and verify iOS 26 SDK
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$XCODE" ]; then
+            sudo xcode-select -s "$XCODE"
+          fi
+          xcodebuild -version
+          if ! xcodebuild -showsdks | grep -qi "iphoneos26"; then
+            echo "ERROR: iOS 26 SDK not present on runner — refusing to gate on an older SDK"
+            exit 1
+          fi
+
+      - name: Generate Xcode project from project.yml
+        run: |
+          brew install xcodegen xcbeautify
+          xcodegen generate
+
+      - name: Build app + Domain package (Domain warnings fail the build)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project WineVault.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            CODE_SIGNING_ALLOWED=NO \
+            SWIFT_STRICT_CONCURRENCY=complete \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            | xcbeautify
+
+      - name: Unit tests (app host) on iOS 26 simulator
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project WineVault.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -only-testing:WineVaultTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify
+
+      - name: Assert simulator app bundle (root-view skeleton)
+        run: |
+          APP=$(find ~/Library/Developer/Xcode/DerivedData \
+            -path "*/Debug-iphonesimulator/WineVault.app" \
+            -maxdepth 6 -print -quit)
+          test -n "$APP" || { echo "No simulator app bundle found"; exit 1; }
+          BID=$(plutil -extract CFBundleIdentifier raw "$APP/Info.plist")
+          [ "$BID" = "com.infinityball.winevault" ] \
+            || { echo "Wrong bundle id: $BID"; exit 1; }
+          file "$APP/WineVault" | grep -q "simulator" \
+            || { echo "Executable is not a simulator-platform binary"; exit 1; }
+          test -f "$APP/Info.plist" && test -x "$APP/WineVault"
+          echo "Simulator skeleton verified: $APP ($BID)"
