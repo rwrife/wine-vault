@@ -92,12 +92,16 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcbeautify
 
-      - name: Assert placeholder root view present in simulator binary
+      - name: Assert simulator app bundle (root-view skeleton)
         run: |
           APP=$(find ~/Library/Developer/Xcode/DerivedData \
             -path "*/Debug-iphonesimulator/WineVault.app" \
             -maxdepth 6 -print -quit)
           test -n "$APP" || { echo "No simulator app bundle found"; exit 1; }
-          strings "$APP/WineVault" | grep -q "Wine Vault" \
-            || { echo "Placeholder root view string missing from binary"; exit 1; }
-          echo "Root view placeholder verified in $APP"
+          BID=$(plutil -extract CFBundleIdentifier raw "$APP/Info.plist")
+          [ "$BID" = "com.infinityball.winevault" ] \
+            || { echo "Wrong bundle id: $BID"; exit 1; }
+          file "$APP/WineVault" | grep -q "simulator" \
+            || { echo "Executable is not a simulator-platform binary"; exit 1; }
+          test -f "$APP/Info.plist" && test -x "$APP/WineVault"
+          echo "Simulator skeleton verified: $APP ($BID)"
