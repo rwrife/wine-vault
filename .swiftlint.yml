@@ -1,0 +1,52 @@
+# SwiftLint configuration for Wine Vault
+#
+# Two enforcement tiers:
+#  - Packages/WineVaultDomain is linted with --strict in CI (warnings fail).
+#  - App targets lint without --strict until the UI layers mature.
+
+disabled_rules:
+  - trailing_comma        # conflicts with formatter opinions, non-critical
+  - todo                  # tracked in issues, not code
+
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - first_where
+  - joined_default_parameter
+  - sorted_imports
+  - unneeded_parentheses_in_closure_argument
+
+force_cast: warning
+
+# @testable imports conventionally follow the module's public imports;
+# alphabetical order would force XCTest after WineVault* which reads badly.
+sorted_imports:
+  excluded:
+    - WineVaultTests
+    - Packages/WineVaultDomain/Tests
+
+line_length:
+  warning: 120
+  error: 160
+
+type_body_length:
+  warning: 300
+  error: 500
+
+file_length:
+  warning: 400
+  error: 800
+
+identifier_name:
+  min_length: 2
+  max_length: 50
+  excluded:
+    - id
+    - x
+    - y
+    - to
+
+excluded:
+  - .build
+  - DerivedData
+  - Packages/.build

@@ -112,8 +112,9 @@ data layer or navigation model.
 
 ## Current status and milestones
 
-Documentation/backlog scaffold only. No app target, build, or store
-artifacts exist yet.
+M1 skeleton in progress: XcodeGen-driven app target, iOS 26 SDK pin in
+CI, Domain Swift package, CI build + test + lint gates. No store or
+network code exists yet.
 
 - [x] M0: README/PLAN, issue backlog, executor cron
 - [ ] M1: project skeleton, CI, local data layer
@@ -124,11 +125,35 @@ artifacts exist yet.
 
 ## Development quickstart
 
-- Xcode 26+ (iOS 26 SDK or newer — required), Swift, SwiftUI
-- `open WineVault.xcodeproj` (workspace created by M1 skeleton issue)
-- Unit tests run on the iOS simulator; UI smoke tests via XCUITest
+The `.xcodeproj` is generated, not committed — one less merge-conflict
+magnet. Requirements: Xcode 26+ (iOS 26 SDK or newer — required) and
+`brew install xcodegen`.
+
+```bash
+brew install xcodegen        # one-time
+xcodegen generate            # -> WineVault.xcodeproj
+open WineVault.xcodeproj     # scheme: WineVault
+```
+
+- Unit tests: `xcodebuild test -project WineVault.xcodeproj -scheme WineVault -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest'`
+- Pure-domain logic lives in `Packages/WineVaultDomain` and also builds +
+  tests on Linux: `cd Packages/WineVaultDomain && swift test`
+- Lint: `swiftlint --strict --config .swiftlint.yml Packages/WineVaultDomain`
 - Release path: GitHub Actions → App Store Connect API (secrets above) →
   TestFlight. See PLAN.md.
+
+## Repository layout
+
+```
+project.yml                  XcodeGen spec (source of truth for the project)
+Packages/WineVaultDomain/    Pure-domain Swift package (no iOS deps, Linux-testable)
+WineVault/                   App target
+  App/                       Entry point
+  Domain/ Data/ Services/    Layers (populated by later milestones)
+  UI/                        SwiftUI views
+WineVaultTests/              App-host unit tests
+.github/workflows/ci.yml     Domain (Linux) + lint + iOS 26 build/test gate
+```
 
 ## License
 
