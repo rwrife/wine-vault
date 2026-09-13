@@ -95,8 +95,8 @@ jobs:
       - name: Assert placeholder root view present in simulator binary
         run: |
           APP=$(find ~/Library/Developer/Xcode/DerivedData \
-            -path "*/Build/Products/Debug-iphonesimulator/WineVault.app" \
-            -maxdepth 4 -print -quit)
+            -path "*/Debug-iphonesimulator/WineVault.app" \
+            -maxdepth 6 -print -quit)
           test -n "$APP" || { echo "No simulator app bundle found"; exit 1; }
           strings "$APP/WineVault" | grep -q "Wine Vault" \
             || { echo "Placeholder root view string missing from binary"; exit 1; }
