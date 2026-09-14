@@ -158,7 +158,7 @@ jobs:
           BID=$(plutil -extract CFBundleIdentifier raw "$APP/Info.plist")
           [ "$BID" = "com.infinityball.winevault" ] \
             || { echo "Wrong bundle id: $BID"; exit 1; }
-          file "$APP/WineVault" | grep -q "simulator" \
+          xcrun vtool -show-build "$APP/WineVault" | grep -Eq 'platform[[:space:]]+IOSSIMULATOR' \
             || { echo "Executable is not a simulator-platform binary"; exit 1; }
           test -f "$APP/Info.plist" && test -x "$APP/WineVault"
           echo "Simulator skeleton verified: $APP ($BID)"

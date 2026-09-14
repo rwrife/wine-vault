@@ -18,8 +18,10 @@ struct ContentView: View {
     @State private var loadState = LoadState.loading
 
     init(repository: (any BottleRepository)? = nil) {
-        repositoryLoader = repository.map { repository in
-            { repository }
+        if let repository {
+            repositoryLoader = { repository }
+        } else {
+            repositoryLoader = nil
         }
     }
 
