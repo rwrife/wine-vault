@@ -1,11 +1,7 @@
 import Foundation
 
-/// Pure-domain seeds for the Wine Vault app.
-///
-/// The Domain layer is intentionally dependency-free: no GRDB, no UIKit,
-/// no networking. Full value types (`Bottle`, `ValuationQuote`) land with
-/// issue #2; this file establishes the layer boundary plus one tested pure
-/// function so the CI warnings-as-errors baseline has real code to gate.
+// The Domain layer is intentionally dependency-free: no GRDB, UIKit,
+// networking, storage, or other side effects.
 
 /// The wine's position relative to its drink-by window.
 public enum DrinkByState: String, Sendable, CaseIterable {
@@ -26,10 +22,10 @@ public enum DrinkByState: String, Sendable, CaseIterable {
 public func drinkByState(
     drinkBy: Date?,
     reference: Date,
-    soonWindowDays: Int = 90
+    soonWindowDays: Int = 90,
+    calendar: Calendar = .current
 ) -> DrinkByState {
     guard let drinkBy else { return .noWindow }
-    let calendar = Calendar.current
     let days = calendar.dateComponents(
         [.day],
         from: calendar.startOfDay(for: reference),
@@ -37,6 +33,6 @@ public func drinkByState(
     ).day ?? 0
     if days < 0 { return .passed }
     if days == 0 { return .ready }
-    if days <= soonWindowDays { return .soon }
+    if soonWindowDays >= 0, days <= soonWindowDays { return .soon }
     return .future
 }

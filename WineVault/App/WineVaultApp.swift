@@ -1,11 +1,13 @@
 import SwiftUI
-import WineVaultDomain
+import WineVaultData
 
 @main
 struct WineVaultApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(repositoryLoader: {
+                try WineVaultDataStack.appPrivateDefault().repository
+            })
         }
     }
 }
