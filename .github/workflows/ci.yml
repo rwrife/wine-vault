@@ -136,6 +136,7 @@ jobs:
             -destination "$DESTINATION" \
             CODE_SIGNING_ALLOWED=NO \
             SWIFT_STRICT_CONCURRENCY=complete \
+            SWIFT_SUPPRESS_WARNINGS=NO \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
             | xcbeautify
 
