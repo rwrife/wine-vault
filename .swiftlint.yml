@@ -18,13 +18,6 @@ opt_in_rules:
 
 force_cast: warning
 
-# @testable imports conventionally follow the module's public imports;
-# alphabetical order would force XCTest after WineVault* which reads badly.
-sorted_imports:
-  excluded:
-    - WineVaultTests
-    - Packages/WineVaultDomain/Tests
-
 line_length:
   warning: 120
   error: 160

@@ -14,10 +14,8 @@ env:
   DESTINATION: "platform=iOS Simulator,name=iPhone 17,OS=latest"
 
 jobs:
-  # Domain-layer warnings-as-errors baseline gate. Runs on any Linux
-  # runner — deterministic and fast, no Xcode needed.
-  domain-package:
-    name: Domain package (warnings-as-errors)
+  packages:
+    name: Domain + data packages (SQLite, coverage)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,12 +23,67 @@ jobs:
       - name: Validate project.yml
         run: bash Scripts/validate_project_yml.sh
 
-      - name: Build + test WineVaultDomain (all warnings are errors)
+      - name: Build Swift 6.1 image with SQLite development headers
+        run: docker build -f .github/docker/SwiftSQLite.Dockerfile -t wine-vault-swift:6.1-sqlite .
+
+      - name: Test Domain and produce LLVM coverage
+        run: |
+          mkdir -p coverage
+          docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD:/src" -w /src/Packages/WineVaultDomain \
+            wine-vault-swift:6.1-sqlite sh -c '
+              set -eu
+              swift test --enable-code-coverage \
+                -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
+              TEST_BINARY=$(find .build -type f \
+                -path "*debug/WineVaultDomainPackageTests.xctest" -print -quit)
+              llvm-cov export -format=lcov "$TEST_BINARY" \
+                -instr-profile=.build/debug/codecov/default.profdata \
+                -ignore-filename-regex="(.build|Tests)/" \
+                > /src/coverage/domain.lcov
+              test -s /src/coverage/domain.lcov
+              find Sources -type f -name "*.swift" -print | while IFS= read -r SOURCE; do
+                grep -Fq "/Packages/WineVaultDomain/$SOURCE" /src/coverage/domain.lcov || {
+                  echo "Missing Domain coverage source entry: $SOURCE"
+                  exit 1
+                }
+              done
+            '
+
+      - name: Test Data with real SQLite and produce LLVM coverage
         run: |
           docker run --rm \
-            -v "$PWD:/src" -w /src/Packages/WineVaultDomain \
-            swift:6.1 \
-            swift test -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD:/src" -w /src/Packages/WineVaultData \
+            wine-vault-swift:6.1-sqlite sh -c '
+              set -eu
+              swift test --enable-code-coverage \
+                -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
+              TEST_BINARY=$(find .build -type f \
+                -path "*debug/WineVaultDataPackageTests.xctest" -print -quit)
+              llvm-cov export -format=lcov "$TEST_BINARY" \
+                -instr-profile=.build/debug/codecov/default.profdata \
+                -ignore-filename-regex="(.build|Tests)/" \
+                > /src/coverage/data.lcov
+              test -s /src/coverage/data.lcov
+              find Sources -type f -name "*.swift" -print | while IFS= read -r SOURCE; do
+                grep -Fq "/Packages/WineVaultData/$SOURCE" /src/coverage/data.lcov || {
+                  echo "Missing Data coverage source entry: $SOURCE"
+                  exit 1
+                }
+              done
+            '
+
+      - name: Archive actual package coverage on pull requests
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-package-coverage
+          path: |
+            coverage/domain.lcov
+            coverage/data.lcov
+          if-no-files-found: error
 
   lint:
     name: SwiftLint
@@ -39,8 +92,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install SwiftLint
         run: brew install swiftlint
-      - name: Lint Domain layer (strict — warnings fail the build)
-        run: swiftlint --strict --config .swiftlint.yml Packages/WineVaultDomain
+      - name: Lint Domain and Data layers (strict — warnings fail the build)
+        run: |
+          swiftlint --strict --config .swiftlint.yml \
+            Packages/WineVaultDomain/Sources Packages/WineVaultDomain/Tests \
+            Packages/WineVaultData/Sources Packages/WineVaultData/Tests
       - name: Lint app sources (non-blocking baseline)
         run: swiftlint --config .swiftlint.yml WineVault WineVaultTests
 
@@ -54,7 +110,9 @@ jobs:
 
       - name: Select newest Xcode 26 and verify iOS 26 SDK
         run: |
-          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          shopt -s nullglob
+          XCODE_CANDIDATES=(/Applications/Xcode_26*.app)
+          XCODE=$(printf '%s\n' "${XCODE_CANDIDATES[@]}" | sort -V | tail -1)
           if [ -n "$XCODE" ]; then
             sudo xcode-select -s "$XCODE"
           fi
@@ -69,7 +127,7 @@ jobs:
           brew install xcodegen xcbeautify
           xcodegen generate
 
-      - name: Build app + Domain package (Domain warnings fail the build)
+      - name: Build app + local packages (warnings fail the build)
         run: |
           set -o pipefail
           xcodebuild build \
@@ -81,7 +139,7 @@ jobs:
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
             | xcbeautify
 
-      - name: Unit tests (app host) on iOS 26 simulator
+      - name: Unit tests (app host + Data CRUD/migration/photo suites) on iOS 26 simulator
         run: |
           set -o pipefail
           xcodebuild test \

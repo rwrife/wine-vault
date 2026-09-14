@@ -112,12 +112,16 @@ data layer or navigation model.
 
 ## Current status and milestones
 
-M1 skeleton in progress: XcodeGen-driven app target, iOS 26 SDK pin in
-CI, Domain Swift package, CI build + test + lint gates. No store or
-network code exists yet.
+The XcodeGen-driven app target retains its iOS 26 SDK requirement. The pure
+Domain package now defines validated inventory and valuation values plus
+collection summaries. A separate Data package owns versioned GRDB/SQLite
+persistence and app-private photo files. The app constructs that data stack
+under Application Support at launch; collection UI remains a later milestone.
+No networking, cloud, telemetry, or secret access exists in either package.
 
 - [x] M0: README/PLAN, issue backlog, executor cron
-- [ ] M1: project skeleton, CI, local data layer
+- [ ] M1: project skeleton, CI, local data layer (source implemented; each PR's
+  hosted iOS 26 CI gates acceptance)
 - [ ] M2: add/browse/edit bottles (core workflow)
 - [ ] M3: opt-in price lookup + collection valuation
 - [ ] M4: dashboards, drink-by reminders, adaptive tablet layout
@@ -136,9 +140,16 @@ open WineVault.xcodeproj     # scheme: WineVault
 ```
 
 - Unit tests: `xcodebuild test -project WineVault.xcodeproj -scheme WineVault -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest'`
-- Pure-domain logic lives in `Packages/WineVaultDomain` and also builds +
-  tests on Linux: `cd Packages/WineVaultDomain && swift test`
-- Lint: `swiftlint --strict --config .swiftlint.yml Packages/WineVaultDomain`
+- Pure-domain logic lives in `Packages/WineVaultDomain`; run
+  `cd Packages/WineVaultDomain && swift test`.
+- GRDB persistence and private photo storage live in `Packages/WineVaultData`;
+  Linux needs SQLite development headers, then run
+  `cd Packages/WineVaultData && swift test`.
+- Both package suites run in CI with Swift 6.1, strict concurrency,
+  warnings-as-errors, and LLVM source coverage. Pull requests archive the
+  `domain.lcov` and `data.lcov` artifacts produced by those runs after CI
+  verifies an `SF` entry for every package source file.
+- Lint: `swiftlint --strict --config .swiftlint.yml Packages/WineVaultDomain Packages/WineVaultData`
 - Release path: GitHub Actions → App Store Connect API (secrets above) →
   TestFlight. See PLAN.md.
 
@@ -147,13 +158,49 @@ open WineVault.xcodeproj     # scheme: WineVault
 ```
 project.yml                  XcodeGen spec (source of truth for the project)
 Packages/WineVaultDomain/    Pure-domain Swift package (no iOS deps, Linux-testable)
+Packages/WineVaultData/      GRDB repository, migrations, and private photo store
 WineVault/                   App target
   App/                       Entry point
   Domain/ Data/ Services/    Layers (populated by later milestones)
   UI/                        SwiftUI views
 WineVaultTests/              App-host unit tests
-.github/workflows/ci.yml     Domain (Linux) + lint + iOS 26 build/test gate
+.github/workflows/ci.yml     Domain/Data (Linux) + coverage + lint + iOS 26 gate
 ```
+
+## Local data architecture
+
+`WineVaultDataStack.appPrivateDefault()` creates
+`Library/Application Support/com.infinityball.winevault/vault.sqlite` and a
+sibling `photos/` directory inside the app container. Database records store
+only validated flat `photos/<filename>` references.
+`WineVaultDataStack.savePhoto(_:fileExtension:for:)` atomically saves and
+attaches a photo, while `garbageCollectOrphanPhotos()` reads repository
+references and removes unreferenced files under the same exclusive coordinator.
+All stack instances share a process-wide coordinator, including reopened vaults;
+serializing independent roots is an intentional MVP tradeoff. Do not mix raw
+standalone repository/photo-store access with a stack-owned storage root.
+Stack-owned repository mutations validate every photo reference under that
+coordinator. Raw photo deletion is disabled for stack-owned stores; use
+`deletePhoto(_:from:)` to detach and conditionally remove a file atomically.
+The root, photos directory, and initialized database file retain their captured
+filesystem identities, which are rechecked before access so detectable
+replacement fails closed while canonical ancestor symlinks remain supported.
+GRDB is pinned exactly to 7.10.0 and migrates registered schemas forward (`v1`
+inventory, then `v2` notes and cascading valuation quotes).
+
+The storage root is app-private and exclusively owned by cooperating
+`WineVaultDataStack` operations in this process. Callers must quiesce and close
+the stack before an external restore or replacement of its files. The iOS
+sandbox prevents other apps from changing them. Deliberate concurrent raw
+filesystem mutation by a compromised process in the same sandbox is outside the
+MVP contract; these path-based checks fail closed on detectable identity
+replacement but do not claim to eliminate every hostile filesystem TOCTOU.
+
+Collection count functions are pure throwing functions: they report
+`CollectionSummaryError.quantityOverflow` instead of trapping if a total does
+not fit in `Int`. `ValuationQuote` values are immutable and validate finite
+nonnegative amounts plus nonblank currency, source, and query provenance during
+both construction and decoding.
 
 ## License
 

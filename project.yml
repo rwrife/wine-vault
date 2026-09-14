@@ -15,6 +15,11 @@ settings:
 packages:
   WineVaultDomain:
     path: Packages/WineVaultDomain
+  WineVaultData:
+    path: Packages/WineVaultData
+  GRDB:
+    url: https://github.com/groue/GRDB.swift.git
+    exactVersion: 7.10.0
 
 targets:
   WineVault:
@@ -24,6 +29,7 @@ targets:
       - path: WineVault
     dependencies:
       - package: WineVaultDomain
+      - package: WineVaultData
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.infinityball.winevault
@@ -39,8 +45,13 @@ targets:
     platform: iOS
     sources:
       - path: WineVaultTests
+      - path: Packages/WineVaultData/Tests/WineVaultDataTests
     dependencies:
       - target: WineVault
+      - package: WineVaultDomain
+      - package: WineVaultData
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
