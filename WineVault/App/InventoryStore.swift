@@ -7,19 +7,20 @@ struct InventoryDependencies: Sendable {
     let repository: any BottleRepository
     let savePhoto: @Sendable (Data, UUID) async throws -> Void
     let photoData: @Sendable (PhotoReference) async throws -> Data
-    let deleteBottle: @Sendable (UUID) async throws -> Void
+    let deleteBottle: @Sendable (UUID) async throws -> BottleDeletionResult
 
     init(
         repository: any BottleRepository,
         savePhoto: @escaping @Sendable (Data, UUID) async throws -> Void = { _, _ in },
         photoData: @escaping @Sendable (PhotoReference) async throws -> Data = { _ in Data() },
-        deleteBottle: (@Sendable (UUID) async throws -> Void)? = nil
+        deleteBottle: (@Sendable (UUID) async throws -> BottleDeletionResult)? = nil
     ) {
         self.repository = repository
         self.savePhoto = savePhoto
         self.photoData = photoData
         self.deleteBottle = deleteBottle ?? { id in
             try await repository.deleteBottle(id: id)
+            return BottleDeletionResult()
         }
     }
 
@@ -47,6 +48,7 @@ final class InventoryStore: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var isSaving = false
     @Published var errorMessage: String?
+    @Published var cleanupWarningMessage: String?
 
     private let dependencies: InventoryDependencies
 
@@ -107,9 +109,16 @@ final class InventoryStore: ObservableObject {
     }
 
     func delete(_ bottle: Bottle) async {
+        cleanupWarningMessage = nil
         do {
-            try await dependencies.deleteBottle(bottle.id)
+            let result = try await dependencies.deleteBottle(bottle.id)
             await load()
+            if !result.pendingPhotoCleanup.isEmpty {
+                let count = result.pendingPhotoCleanup.count
+                cleanupWarningMessage = "Bottle deleted, but \(count) label photo "
+                    + (count == 1 ? "file still needs" : "files still need")
+                    + " cleanup from private storage."
+            }
         } catch {
             errorMessage = "The bottle could not be deleted. \(error.localizedDescription)"
         }

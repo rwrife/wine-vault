@@ -93,6 +93,35 @@ final class WineVaultAppTests: XCTestCase {
     }
 
     @MainActor
+    func testInventoryStoreReloadsAfterCommittedDeleteWithPhotoCleanupWarning() async throws {
+        let repository = try SQLiteBottleRepository(inMemory: true)
+        let reference = try PhotoReference("photos/pending.jpg")
+        let bottle = try Bottle(
+            name: "Cleanup Warning",
+            quantity: 1,
+            storageLocation: "Rack",
+            photos: [reference]
+        )
+        try await repository.create(bottle)
+        let store = InventoryStore(
+            dependencies: InventoryDependencies(
+                repository: repository,
+                deleteBottle: { id in
+                    try await repository.deleteBottle(id: id)
+                    return BottleDeletionResult(pendingPhotoCleanup: [reference])
+                }
+            )
+        )
+        await store.load()
+
+        await store.delete(bottle)
+
+        XCTAssertTrue(store.bottles.isEmpty)
+        XCTAssertNil(store.errorMessage)
+        XCTAssertTrue(store.cleanupWarningMessage?.contains("Bottle deleted") == true)
+    }
+
+    @MainActor
     func testInventoryStoreCanRetryAfterPhotoWriteFailsAfterCreate() async throws {
         let repository = try SQLiteBottleRepository(inMemory: true)
         let attempts = PhotoSaveAttempts()

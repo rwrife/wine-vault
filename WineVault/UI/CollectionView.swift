@@ -55,6 +55,11 @@ struct CollectionView: View {
         } message: {
             Text(store.errorMessage ?? "Unknown error")
         }
+        .alert("Photo cleanup incomplete", isPresented: cleanupWarningPresented) {
+            Button("OK") { store.cleanupWarningMessage = nil }
+        } message: {
+            Text(store.cleanupWarningMessage ?? "The bottle was deleted.")
+        }
     }
 
     private var browser: some View {
@@ -131,6 +136,13 @@ struct CollectionView: View {
         Binding(
             get: { store.errorMessage != nil },
             set: { if !$0 { store.errorMessage = nil } }
+        )
+    }
+
+    private var cleanupWarningPresented: Binding<Bool> {
+        Binding(
+            get: { store.cleanupWarningMessage != nil },
+            set: { if !$0 { store.cleanupWarningMessage = nil } }
         )
     }
 }

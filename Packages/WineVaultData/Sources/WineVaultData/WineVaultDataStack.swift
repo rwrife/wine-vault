@@ -7,6 +7,14 @@ public enum AppPrivatePathError: Error, Equatable, Sendable {
     case unsafeRootDirectory
 }
 
+public struct BottleDeletionResult: Equatable, Sendable {
+    public let pendingPhotoCleanup: [PhotoReference]
+
+    public init(pendingPhotoCleanup: [PhotoReference] = []) {
+        self.pendingPhotoCleanup = pendingPhotoCleanup
+    }
+}
+
 public enum AppPrivatePaths {
     public static func rootDirectory(
         applicationSupportDirectory: URL,
@@ -145,16 +153,31 @@ public struct WineVaultDataStack: Sendable {
     }
 
     /// Deletes a bottle and removes only photos no remaining bottle references.
-    public func deleteBottle(id: UUID) async throws {
+    @discardableResult
+    public func deleteBottle(id: UUID) async throws -> BottleDeletionResult {
         try await coordinator.withExclusiveAccess {
             guard let bottle = try await repository.bottleWithoutCoordination(id: id) else {
                 throw RepositoryError.bottleNotFound(id)
             }
             try await repository.deleteBottleWithoutCoordination(id: id)
-            let remainingReferences = try await repository.photoReferencesWithoutCoordination()
-            for reference in Set(bottle.photos) where !remainingReferences.contains(reference) {
-                try await photos.deleteWithoutCoordination(reference)
+            let deletedReferences = Set(bottle.photos).sorted { $0.path < $1.path }
+            let remainingReferences: Set<PhotoReference>
+            do {
+                remainingReferences = try await repository.photoReferencesWithoutCoordination()
+            } catch {
+                return BottleDeletionResult(pendingPhotoCleanup: deletedReferences)
             }
+            let unreferenced = deletedReferences
+                .filter { !remainingReferences.contains($0) }
+            var pendingPhotoCleanup: [PhotoReference] = []
+            for reference in unreferenced {
+                do {
+                    try await photos.deleteWithoutCoordination(reference)
+                } catch {
+                    pendingPhotoCleanup.append(reference)
+                }
+            }
+            return BottleDeletionResult(pendingPhotoCleanup: pendingPhotoCleanup)
         }
     }
 

@@ -122,7 +122,9 @@ Deletion is permanent after confirmation and also removes that bottle's
 cascading valuation history; undo is intentionally not offered because it
 could not faithfully restore those quotes. App-stack deletion also removes
 private photo files that no remaining bottle references while preserving any
-shared photo reference.
+shared photo reference. If filesystem safety checks prevent post-delete photo
+cleanup, the deletion remains committed, the app reports a cleanup warning,
+and explicit orphan garbage collection remains available for recovery.
 
 - [x] M0: README/PLAN, issue backlog, executor cron
 - [ ] M1: project skeleton, CI, local data layer (source implemented; each PR's
