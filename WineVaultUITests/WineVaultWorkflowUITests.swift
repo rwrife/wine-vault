@@ -24,7 +24,7 @@ final class WineVaultWorkflowUITests: XCTestCase {
         app.textFields["bottleNameField"].typeText("Estate Reserve")
         app.textFields["producerField"].tap()
         app.textFields["producerField"].typeText("Maison Test")
-        tapAfterScrolling(app.steppers["quantityStepper"].buttons["Increment"])
+        incrementQuantity(expectedValue: 2)
         app.buttons["saveBottleButton"].tap()
 
         let addedBottleExists = bottleElement(named: "Estate Reserve").waitForExistence(timeout: 5)
@@ -35,7 +35,7 @@ final class WineVaultWorkflowUITests: XCTestCase {
         openBottle(named: "Estate Reserve")
         app.buttons["editBottleButton"].tap()
         replaceText(in: app.textFields["bottleNameField"], with: "Estate Reserve Edited")
-        tapAfterScrolling(app.steppers["quantityStepper"].buttons["Increment"])
+        incrementQuantity(expectedValue: 3)
         app.buttons["saveBottleButton"].tap()
 
         returnToCollectionIfNeeded()
@@ -68,7 +68,8 @@ final class WineVaultWorkflowUITests: XCTestCase {
         app.buttons["emptyAddBottleButton"].tap()
         app.buttons["saveBottleButton"].tap()
 
-        let error = app.descendants(matching: .any)["validation_nameRequired"]
+        captureHierarchyForFailure(named: "Inline validation")
+        let error = app.staticTexts["validation_nameRequired"].firstMatch
         let errorExists = error.waitForExistence(timeout: 3)
         let errorLabel = error.label
         XCTAssertTrue(errorExists)
@@ -90,7 +91,14 @@ final class WineVaultWorkflowUITests: XCTestCase {
         let saveButtonExists = app.buttons["saveBottleButton"].exists
         XCTAssertTrue(nameFieldExists)
         XCTAssertTrue(saveButtonExists)
-        tapAfterScrolling(app.steppers["quantityStepper"])
+        incrementQuantity(expectedValue: 2)
+        let decrement = app.buttons["Decrement"].firstMatch
+        scrollForm(untilHittable: decrement)
+        captureHierarchyForFailure(named: "AX5 quantity controls")
+        let decrementExists = decrement.exists
+        let decrementIsHittable = decrement.isHittable
+        XCTAssertTrue(decrementExists)
+        XCTAssertTrue(decrementIsHittable)
     }
 
     @MainActor
@@ -136,20 +144,55 @@ final class WineVaultWorkflowUITests: XCTestCase {
     @MainActor
     private func replaceText(in field: XCUIElement, with text: String) {
         field.tap()
-        field.press(forDuration: 1)
-        if app.menuItems["Select All"].waitForExistence(timeout: 2) {
-            app.menuItems["Select All"].tap()
+        let currentValue = field.value as? String ?? ""
+        if !currentValue.isEmpty {
+            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
         }
         field.typeText(text)
     }
 
     @MainActor
-    private func tapAfterScrolling(_ element: XCUIElement) {
-        for _ in 0..<5 where !element.isHittable {
-            app.swipeUp()
+    private func incrementQuantity(expectedValue: Int) {
+        dismissKeyboardIfPresent()
+        let increment = app.buttons["Increment"].firstMatch
+        scrollForm(untilHittable: increment)
+        captureHierarchyForFailure(named: "Quantity controls")
+        let incrementExists = increment.exists
+        let incrementIsHittable = increment.isHittable
+        XCTAssertTrue(incrementExists)
+        XCTAssertTrue(incrementIsHittable)
+        increment.tap()
+
+        let quantity = app.staticTexts["Quantity: \(expectedValue)"].firstMatch
+        let quantityChanged = quantity.waitForExistence(timeout: 3)
+        XCTAssertTrue(quantityChanged)
+    }
+
+    @MainActor
+    private func dismissKeyboardIfPresent() {
+        let keyboard = app.keyboards.firstMatch
+        guard keyboard.exists else { return }
+        let done = keyboard.buttons["Done"].firstMatch
+        if done.exists {
+            done.tap()
+        } else {
+            keyboard.swipeDown()
         }
-        let isHittable = element.isHittable
-        XCTAssertTrue(isHittable)
-        element.tap()
+    }
+
+    @MainActor
+    private func scrollForm(untilHittable element: XCUIElement) {
+        let form = app.collectionViews.firstMatch
+        for _ in 0..<6 where !element.exists || !element.isHittable {
+            form.swipeUp()
+        }
+    }
+
+    @MainActor
+    private func captureHierarchyForFailure(named name: String) {
+        let attachment = XCTAttachment(string: app.debugDescription)
+        attachment.name = name
+        attachment.lifetime = .deleteOnSuccess
+        add(attachment)
     }
 }

@@ -68,6 +68,7 @@ struct BottleFormView: View {
                 .accessibilityIdentifier("bottleNameField")
             validation(.nameRequired)
             TextField("Producer", text: $form.producer)
+                .submitLabel(.done)
                 .accessibilityIdentifier("producerField")
             TextField("Vintage", text: $form.vintage)
                 .keyboardType(.numberPad)
@@ -89,12 +90,15 @@ struct BottleFormView: View {
 
     private var quantitySection: some View {
         Section("Quantity") {
-            Stepper(value: $form.quantity, in: 1...999) {
-                Text("Quantity: \(form.quantity)")
-            }
-            .accessibilityLabel("Bottle quantity")
-            .accessibilityValue(String(form.quantity))
-            .accessibilityIdentifier("quantityStepper")
+            Stepper(
+                "Quantity: \(form.quantity)",
+                onIncrement: {
+                    if form.quantity < 999 { form.quantity += 1 }
+                },
+                onDecrement: {
+                    if form.quantity > 1 { form.quantity -= 1 }
+                }
+            )
             validation(.quantityMustBePositive)
         }
     }
