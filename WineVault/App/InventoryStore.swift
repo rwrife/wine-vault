@@ -37,11 +37,10 @@ final class InventoryStore: ObservableObject {
     @Published private(set) var bottles: [Bottle] = []
     @Published var criteria = BottleFilterCriteria()
     @Published private(set) var isLoading = false
+    @Published private(set) var isSaving = false
     @Published var errorMessage: String?
-    @Published private(set) var canUndoDelete = false
 
     private let dependencies: InventoryDependencies
-    private var deletedBottle: Bottle?
 
     init(repository: any BottleRepository) {
         dependencies = InventoryDependencies(repository: repository)
@@ -72,6 +71,9 @@ final class InventoryStore: ObservableObject {
 
     @discardableResult
     func save(_ form: BottleForm, photoData: Data? = nil) async -> Bool {
+        guard !isSaving else { return false }
+        isSaving = true
+        defer { isSaving = false }
         do {
             let bottle = try form.bottle()
             // Ask the repository rather than the last loaded snapshot. A photo write can
@@ -99,23 +101,9 @@ final class InventoryStore: ObservableObject {
     func delete(_ bottle: Bottle) async {
         do {
             try await dependencies.repository.deleteBottle(id: bottle.id)
-            deletedBottle = bottle
-            canUndoDelete = true
             await load()
         } catch {
             errorMessage = "The bottle could not be deleted. \(error.localizedDescription)"
-        }
-    }
-
-    func undoDelete() async {
-        guard let deletedBottle else { return }
-        do {
-            try await dependencies.repository.create(deletedBottle)
-            self.deletedBottle = nil
-            canUndoDelete = false
-            await load()
-        } catch {
-            errorMessage = "The deletion could not be undone. \(error.localizedDescription)"
         }
     }
 

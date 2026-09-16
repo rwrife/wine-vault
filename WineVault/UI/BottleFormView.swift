@@ -36,10 +36,12 @@ struct BottleFormView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .disabled(store.isSaving)
                         .accessibilityIdentifier("cancelBottleButton")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
+                    Button(store.isSaving ? "Saving…" : "Save") { save() }
+                        .disabled(store.isSaving)
                         .accessibilityIdentifier("saveBottleButton")
                 }
             }
@@ -54,6 +56,7 @@ struct BottleFormView: View {
             } message: {
                 Text(store.errorMessage ?? "Unknown error")
             }
+            .interactiveDismissDisabled(store.isSaving)
         }
     }
 
@@ -153,7 +156,10 @@ struct BottleFormView: View {
                     .frame(maxHeight: 220)
                     .accessibilityLabel("Captured label photo")
             } else if !form.photos.isEmpty {
-                Label("Label photo saved", systemImage: "photo")
+                Label(
+                    form.photos.count == 1 ? "1 label photo saved" : "\(form.photos.count) label photos saved",
+                    systemImage: "photo"
+                )
             }
             cameraAction
             if cameraStatus == .denied || cameraStatus == .restricted {

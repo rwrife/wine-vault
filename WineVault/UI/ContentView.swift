@@ -15,8 +15,12 @@ struct ContentView: View {
     @State private var store: InventoryStore?
 
     init(repository: (any BottleRepository)? = nil) {
-        dependenciesLoader = repository.map { repository in
-            { InventoryDependencies(repository: repository) }
+        if let repository {
+            dependenciesLoader = {
+                InventoryDependencies(repository: repository)
+            }
+        } else {
+            dependenciesLoader = nil
         }
     }
 

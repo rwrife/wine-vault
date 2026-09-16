@@ -9,12 +9,15 @@ struct BottleDetailView: View {
 
     var body: some View {
         List {
-            if let photo = bottle.photos.first {
-                BottlePhotoView(reference: photo, store: store)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 260)
-                    .clipShape(.rect(cornerRadius: 12))
-                    .listRowInsets(EdgeInsets())
+            if !bottle.photos.isEmpty {
+                Section("Label photos") {
+                    ForEach(Array(bottle.photos.enumerated()), id: \.offset) { _, photo in
+                        BottlePhotoView(reference: photo, store: store)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 260)
+                            .clipShape(.rect(cornerRadius: 12))
+                    }
+                }
             }
             Section("Bottle") {
                 detail("Name", bottle.name)

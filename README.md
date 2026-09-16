@@ -118,6 +118,9 @@ repository, with optional camera-only label capture into the existing private
 photo store. Compact width uses stacked navigation and regular width keeps the
 browser and detail visible. No networking, accounts, cloud, telemetry, Photo
 Library permission, or secret access is used by this workflow.
+Deletion is permanent after confirmation and also removes that bottle's
+cascading valuation history; undo is intentionally not offered because it
+could not faithfully restore those quotes.
 
 - [x] M0: README/PLAN, issue backlog, executor cron
 - [ ] M1: project skeleton, CI, local data layer (source implemented; each PR's
@@ -213,7 +216,7 @@ both construction and decoding.
 | Complete add/edit form, stepper, tags, inline labeled validation | Implemented; domain tests cover normalization, invalid fields, identity, and photo preservation | Domain tests runnable in Swift Docker |
 | Optional camera, rationale, usage description, manual fallback, no Photo Library permission | Camera-only capture writes through `WineVaultDataStack.savePhoto`; denied/unavailable states keep the form usable | **BLOCKED-NOT-DONE:** needs a real device/simulator permission check |
 | Browse fields, search, and region/grape/tag/drink-by filters | Implemented; domain tests cover search, composed filters, drink-by injection, and facets | Domain behavior is Linux-testable; rendered UI needs iOS evidence |
-| Confirmed deletion and undo | Implemented; app-host store test exercises delete and undo | **BLOCKED-NOT-DONE:** app-host execution needs Xcode 26 |
+| Confirmed permanent deletion | Implemented; confirmation states that the bottle and cascading valuation history are deleted | **BLOCKED-NOT-DONE:** app-host execution needs Xcode 26 |
 | Empty states, compact stack, regular split, Dynamic Type AX5, VoiceOver labels | Implemented with adaptive system SwiftUI controls and no fixed text sizes | **BLOCKED-NOT-DONE:** requires manual AX5/VoiceOver and size-class checks; no accessibility claim is made yet |
 | XCUITest add → list → search → edit → delete | Added to `WineVaultUITests`, the generated scheme, and the iOS 26 CI invocation | **BLOCKED-NOT-DONE locally:** Linux has no Xcode/iOS simulator; hosted CI must provide evidence |
 

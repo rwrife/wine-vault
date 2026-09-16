@@ -48,24 +48,12 @@ struct CollectionView: View {
             }
             .accessibilityIdentifier("confirmDeleteButton")
         } message: {
-            Text("This removes the bottle from your local collection.")
+            Text("This permanently removes the bottle and its saved valuation history.")
         }
         .alert("Something went wrong", isPresented: errorPresented) {
             Button("OK") { store.errorMessage = nil }
         } message: {
             Text(store.errorMessage ?? "Unknown error")
-        }
-        .safeAreaInset(edge: .bottom) {
-            if store.canUndoDelete {
-                HStack {
-                    Text("Bottle deleted")
-                    Spacer()
-                    Button("Undo") { Task { await store.undoDelete() } }
-                        .accessibilityIdentifier("undoDeleteButton")
-                }
-                .padding()
-                .background(.regularMaterial)
-            }
         }
     }
 
@@ -153,7 +141,7 @@ private struct BottleRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            BottlePhotoView(reference: bottle.photos.first, store: store)
+            BottlePhotoView(reference: bottle.photos.last, store: store)
                 .frame(width: 52, height: 68)
                 .clipShape(.rect(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 4) {
