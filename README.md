@@ -120,7 +120,9 @@ browser and detail visible. No networking, accounts, cloud, telemetry, Photo
 Library permission, or secret access is used by this workflow.
 Deletion is permanent after confirmation and also removes that bottle's
 cascading valuation history; undo is intentionally not offered because it
-could not faithfully restore those quotes.
+could not faithfully restore those quotes. App-stack deletion also removes
+private photo files that no remaining bottle references while preserving any
+shared photo reference.
 
 - [x] M0: README/PLAN, issue backlog, executor cron
 - [ ] M1: project skeleton, CI, local data layer (source implemented; each PR's

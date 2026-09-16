@@ -13,7 +13,8 @@ struct WineVaultApp: App {
                 savePhoto: { data, bottleID in
                     _ = try await stack.savePhoto(data, fileExtension: "jpg", for: bottleID)
                 },
-                photoData: { reference in try await stack.photos.data(for: reference) }
+                photoData: { reference in try await stack.photos.data(for: reference) },
+                deleteBottle: { id in try await stack.deleteBottle(id: id) }
             )
         }
         return try InventoryDependencies.appPrivateDefault()

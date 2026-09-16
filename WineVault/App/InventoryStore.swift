@@ -7,15 +7,20 @@ struct InventoryDependencies: Sendable {
     let repository: any BottleRepository
     let savePhoto: @Sendable (Data, UUID) async throws -> Void
     let photoData: @Sendable (PhotoReference) async throws -> Data
+    let deleteBottle: @Sendable (UUID) async throws -> Void
 
     init(
         repository: any BottleRepository,
         savePhoto: @escaping @Sendable (Data, UUID) async throws -> Void = { _, _ in },
-        photoData: @escaping @Sendable (PhotoReference) async throws -> Data = { _ in Data() }
+        photoData: @escaping @Sendable (PhotoReference) async throws -> Data = { _ in Data() },
+        deleteBottle: (@Sendable (UUID) async throws -> Void)? = nil
     ) {
         self.repository = repository
         self.savePhoto = savePhoto
         self.photoData = photoData
+        self.deleteBottle = deleteBottle ?? { id in
+            try await repository.deleteBottle(id: id)
+        }
     }
 
     static func appPrivateDefault() throws -> InventoryDependencies {
@@ -27,6 +32,9 @@ struct InventoryDependencies: Sendable {
             },
             photoData: { reference in
                 try await stack.photos.data(for: reference)
+            },
+            deleteBottle: { id in
+                try await stack.deleteBottle(id: id)
             }
         )
     }
@@ -100,7 +108,7 @@ final class InventoryStore: ObservableObject {
 
     func delete(_ bottle: Bottle) async {
         do {
-            try await dependencies.repository.deleteBottle(id: bottle.id)
+            try await dependencies.deleteBottle(bottle.id)
             await load()
         } catch {
             errorMessage = "The bottle could not be deleted. \(error.localizedDescription)"

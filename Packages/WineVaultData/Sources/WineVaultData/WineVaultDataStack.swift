@@ -144,6 +144,20 @@ public struct WineVaultDataStack: Sendable {
         }
     }
 
+    /// Deletes a bottle and removes only photos no remaining bottle references.
+    public func deleteBottle(id: UUID) async throws {
+        try await coordinator.withExclusiveAccess {
+            guard let bottle = try await repository.bottleWithoutCoordination(id: id) else {
+                throw RepositoryError.bottleNotFound(id)
+            }
+            try await repository.deleteBottleWithoutCoordination(id: id)
+            let remainingReferences = try await repository.photoReferencesWithoutCoordination()
+            for reference in Set(bottle.photos) where !remainingReferences.contains(reference) {
+                try await photos.deleteWithoutCoordination(reference)
+            }
+        }
+    }
+
     /// Removes orphan files while repository mutations and photo saves are excluded.
     @discardableResult
     public func garbageCollectOrphanPhotos() async throws -> [PhotoReference] {

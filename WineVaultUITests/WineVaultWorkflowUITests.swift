@@ -6,12 +6,18 @@ final class WineVaultWorkflowUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+    }
+
+    @MainActor
+    private func launchDefaultApp() {
         app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
         app.launch()
     }
 
+    @MainActor
     func testAddListSearchEditAndDelete() {
+        launchDefaultApp()
         app.buttons["emptyAddBottleButton"].tap()
 
         app.textFields["bottleNameField"].tap()
@@ -21,8 +27,10 @@ final class WineVaultWorkflowUITests: XCTestCase {
         tapAfterScrolling(app.steppers["quantityStepper"].buttons["Increment"])
         app.buttons["saveBottleButton"].tap()
 
-        XCTAssertTrue(bottleElement(named: "Estate Reserve").waitForExistence(timeout: 5))
-        XCTAssertTrue(element(containingLabel: "Quantity 2").exists)
+        let addedBottleExists = bottleElement(named: "Estate Reserve").waitForExistence(timeout: 5)
+        let addedQuantityExists = element(containingLabel: "Quantity 2").exists
+        XCTAssertTrue(addedBottleExists)
+        XCTAssertTrue(addedQuantityExists)
 
         openBottle(named: "Estate Reserve")
         app.buttons["editBottleButton"].tap()
@@ -32,11 +40,14 @@ final class WineVaultWorkflowUITests: XCTestCase {
 
         returnToCollectionIfNeeded()
         let search = app.searchFields.firstMatch
-        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        let searchExists = search.waitForExistence(timeout: 5)
+        XCTAssertTrue(searchExists)
         search.tap()
         search.typeText("maison test")
-        XCTAssertTrue(bottleElement(named: "Estate Reserve Edited").waitForExistence(timeout: 5))
-        XCTAssertTrue(element(containingLabel: "Quantity 3").exists)
+        let editedBottleExists = bottleElement(named: "Estate Reserve Edited").waitForExistence(timeout: 5)
+        let editedQuantityExists = element(containingLabel: "Quantity 3").exists
+        XCTAssertTrue(editedBottleExists)
+        XCTAssertTrue(editedQuantityExists)
 
         openBottle(named: "Estate Reserve Edited")
         app.buttons["deleteBottleButton"].tap()
@@ -47,21 +58,26 @@ final class WineVaultWorkflowUITests: XCTestCase {
             app.alerts.buttons["Delete"].tap()
         }
 
-        XCTAssertTrue(app.staticTexts["Your collection is empty"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["undoDeleteButton"].exists)
+        let emptyStateExists = app.staticTexts["Your collection is empty"].waitForExistence(timeout: 5)
+        XCTAssertTrue(emptyStateExists)
     }
 
+    @MainActor
     func testEmptySaveShowsInlineAccessibleValidation() {
+        launchDefaultApp()
         app.buttons["emptyAddBottleButton"].tap()
         app.buttons["saveBottleButton"].tap()
 
         let error = app.descendants(matching: .any)["validation_nameRequired"]
-        XCTAssertTrue(error.waitForExistence(timeout: 3))
-        XCTAssertEqual(error.label, "Error: Enter a bottle name.")
+        let errorExists = error.waitForExistence(timeout: 3)
+        let errorLabel = error.label
+        XCTAssertTrue(errorExists)
+        XCTAssertEqual(errorLabel, "Error: Enter a bottle name.")
     }
 
+    @MainActor
     func testAX5ManualEntryKeepsEssentialControlsReachable() {
-        app.terminate()
+        app = XCUIApplication()
         app.launchArguments = [
             "--ui-testing",
             "-UIPreferredContentSizeCategoryName",
@@ -70,41 +86,54 @@ final class WineVaultWorkflowUITests: XCTestCase {
         app.launch()
 
         app.buttons["emptyAddBottleButton"].tap()
-        XCTAssertTrue(app.textFields["bottleNameField"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["saveBottleButton"].exists)
+        let nameFieldExists = app.textFields["bottleNameField"].waitForExistence(timeout: 3)
+        let saveButtonExists = app.buttons["saveBottleButton"].exists
+        XCTAssertTrue(nameFieldExists)
+        XCTAssertTrue(saveButtonExists)
         tapAfterScrolling(app.steppers["quantityStepper"])
     }
 
+    @MainActor
     func testRegularWidthShowsBrowserAndDetailColumns() throws {
+        launchDefaultApp()
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
         try XCTSkipUnless(
-            UIDevice.current.userInterfaceIdiom == .pad,
+            isPad,
             "Regular-width assertion runs in the CI iPad destination"
         )
-        XCTAssertTrue(app.buttons["emptyAddBottleButton"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Select a bottle"].exists)
+        let addButtonExists = app.buttons["emptyAddBottleButton"].waitForExistence(timeout: 3)
+        let detailPlaceholderExists = app.staticTexts["Select a bottle"].exists
+        XCTAssertTrue(addButtonExists)
+        XCTAssertTrue(detailPlaceholderExists)
     }
 
+    @MainActor
     private func openBottle(named name: String) {
         let bottle = bottleElement(named: name)
-        XCTAssertTrue(bottle.waitForExistence(timeout: 5))
+        let bottleExists = bottle.waitForExistence(timeout: 5)
+        XCTAssertTrue(bottleExists)
         bottle.tap()
     }
 
+    @MainActor
     private func bottleElement(named name: String) -> XCUIElement {
         element(containingLabel: name)
     }
 
+    @MainActor
     private func element(containingLabel text: String) -> XCUIElement {
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS %@", text))
             .firstMatch
     }
 
+    @MainActor
     private func returnToCollectionIfNeeded() {
         let backButton = app.navigationBars.buttons["Wine Vault"]
         if backButton.exists { backButton.tap() }
     }
 
+    @MainActor
     private func replaceText(in field: XCUIElement, with text: String) {
         field.tap()
         field.press(forDuration: 1)
@@ -114,11 +143,13 @@ final class WineVaultWorkflowUITests: XCTestCase {
         field.typeText(text)
     }
 
+    @MainActor
     private func tapAfterScrolling(_ element: XCUIElement) {
         for _ in 0..<5 where !element.isHittable {
             app.swipeUp()
         }
-        XCTAssertTrue(element.isHittable)
+        let isHittable = element.isHittable
+        XCTAssertTrue(isHittable)
         element.tap()
     }
 }

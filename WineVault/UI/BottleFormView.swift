@@ -31,6 +31,7 @@ struct BottleFormView: View {
                 photoSection
                 notesSection
             }
+            .disabled(store.isSaving)
             .navigationTitle(isEditing ? "Edit Bottle" : "Add Bottle")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
