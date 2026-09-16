@@ -1,12 +1,8 @@
 import SwiftUI
 import WineVaultData
 
-/// Placeholder root view (issue #1 skeleton).
-///
-/// Opens the local repository and surfaces a retryable error if startup fails.
-/// The real browse/detail navigation lands with the core workflow UI issue.
 struct ContentView: View {
-    typealias RepositoryLoader = @Sendable () async throws -> any BottleRepository
+    typealias DependenciesLoader = @Sendable () async throws -> InventoryDependencies
 
     enum LoadState: Equatable {
         case loading
@@ -14,66 +10,72 @@ struct ContentView: View {
         case failed(String)
     }
 
-    private let repositoryLoader: RepositoryLoader?
+    private let dependenciesLoader: DependenciesLoader?
     @State private var loadState = LoadState.loading
+    @State private var store: InventoryStore?
 
     init(repository: (any BottleRepository)? = nil) {
-        if let repository {
-            repositoryLoader = { repository }
-        } else {
-            repositoryLoader = nil
+        dependenciesLoader = repository.map { repository in
+            { InventoryDependencies(repository: repository) }
         }
     }
 
-    init(repositoryLoader: @escaping RepositoryLoader) {
-        self.repositoryLoader = repositoryLoader
+    init(repositoryLoader: @escaping @Sendable () async throws -> any BottleRepository) {
+        dependenciesLoader = {
+            InventoryDependencies(repository: try await repositoryLoader())
+        }
+    }
+
+    init(dependenciesLoader: @escaping DependenciesLoader) {
+        self.dependenciesLoader = dependenciesLoader
     }
 
     var body: some View {
-        NavigationStack {
-            content
-            .navigationTitle("Wine Vault")
-        }
-        .task {
-            await loadRepository()
-        }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        switch loadState {
-        case .loading:
-            ProgressView("Opening your collection…")
-        case .ready:
-            ContentUnavailableView(
-                "Wine Vault",
-                systemImage: "wineglass",
-                description: Text("Collection coming soon. Local-first, always.")
-            )
-        case let .failed(message):
-            ContentUnavailableView {
-                Label("Collection unavailable", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Try Again") {
-                    Task { await loadRepository() }
+        Group {
+            switch (loadState, store) {
+            case (.loading, _):
+                ProgressView("Opening your collection…")
+            case let (.ready, store?):
+                CollectionView(store: store)
+            case let (.failed(message), _):
+                ContentUnavailableView {
+                    Label("Collection unavailable", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button("Try Again") { Task { await loadDependencies() } }
+                        .accessibilityIdentifier("retryButton")
                 }
+            default:
+                ProgressView("Opening your collection…")
             }
         }
+        .task { await loadDependencies() }
     }
 
     @MainActor
-    private func loadRepository() async {
+    private func loadDependencies() async {
         loadState = .loading
-        loadState = await Self.load(using: repositoryLoader)
+        do {
+            let dependencies = try await dependenciesLoader?()
+                ?? InventoryDependencies(repository: SQLiteBottleRepository(inMemory: true))
+            let store = InventoryStore(dependencies: dependencies)
+            await store.load()
+            if let message = store.errorMessage {
+                loadState = .failed(message)
+            } else {
+                self.store = store
+                loadState = .ready
+            }
+        } catch {
+            loadState = .failed("Your local collection could not be opened. \(error.localizedDescription)")
+        }
     }
 
-    static func load(using loader: RepositoryLoader?) async -> LoadState {
+    static func load(using loader: (@Sendable () async throws -> any BottleRepository)?) async -> LoadState {
         guard let loader else { return .ready }
         do {
-            let repository = try await loader()
-            _ = try await repository.bottles()
+            _ = try await loader().bottles()
             return .ready
         } catch {
             return .failed("Your local collection could not be opened. \(error.localizedDescription)")

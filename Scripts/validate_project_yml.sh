@@ -21,5 +21,11 @@ assert doc["options"]["deploymentTarget"]["iOS"] == "26.0", "iOS 26 deployment t
 app = doc["targets"]["WineVault"]
 assert app["type"] == "application"
 assert app["settings"]["base"]["PRODUCT_BUNDLE_IDENTIFIER"] == "com.infinityball.winevault"
-print("project.yml OK: WineVault app, iOS 26.0, com.infinityball.winevault")
+assert "INFOPLIST_KEY_NSCameraUsageDescription" in app["settings"]["base"]
+ui_tests = doc["targets"]["WineVaultUITests"]
+assert ui_tests["type"] == "bundle.ui-testing"
+assert {"WineVaultTests", "WineVaultUITests"}.issubset(
+    set(doc["schemes"]["WineVault"]["test"]["targets"])
+)
+print("project.yml OK: iOS 26 app + unit/UI test targets + camera rationale")
 PY
