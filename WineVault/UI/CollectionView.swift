@@ -46,7 +46,6 @@ struct CollectionView: View {
                 if selection == bottle.id { selection = nil }
                 Task { await store.delete(bottle) }
             }
-            .accessibilityIdentifier("confirmDeleteButton")
         } message: {
             Text("This permanently removes the bottle and its saved valuation history.")
         }
