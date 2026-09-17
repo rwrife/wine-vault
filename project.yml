@@ -40,6 +40,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_NSCameraUsageDescription: "Photograph a wine label when you choose; photos stay in Wine Vault's private storage."
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait"
 
@@ -61,12 +62,26 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/WineVault.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WineVault"
 
+  WineVaultUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: WineVaultUITests
+    dependencies:
+      - target: WineVault
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.infinityball.winevault.uitests
+        TEST_TARGET_NAME: WineVault
+
 schemes:
   WineVault:
     build:
       targets:
         WineVault: all
         WineVaultTests: [test]
+        WineVaultUITests: [test]
     run:
       config: Debug
     test:
@@ -74,5 +89,6 @@ schemes:
       gatherCoverageData: true
       targets:
         - WineVaultTests
+        - WineVaultUITests
     archive:
       config: Release

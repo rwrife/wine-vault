@@ -71,7 +71,8 @@ Android is an explicitly deferred optional secondary.
 - Persistence: in-memory SQLite round-trip tests, migration tests.
 - Valuation service: protocol mock with canned/fixture responses; no live
   network in CI. Error paths: timeout, no-result, ambiguous match.
-- UI: XCUITest smoke flows (add → browse → filter → export).
+- UI: XCUITest core flow (add → list → search → edit → delete),
+  inline-validation/AX5 checks, and a regular-width split assertion.
 - Release gate: `xcodebuild` on iOS 26 simulator in CI.
 
 ## Packaging / distribution

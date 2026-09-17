@@ -180,6 +180,94 @@ final class WineVaultDataStackTests: XCTestCase {
         await XCTAssertThrowsPhotoError(try await stack.photos.data(for: reference), .photoNotFound)
     }
 
+    func testStackDeleteBottleRemovesExclusivelyReferencedPhotos() async throws {
+        let (stack, root) = try makeStack()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bottle = try Bottle(name: "Exclusive", quantity: 1, storageLocation: "Rack")
+        try await stack.repository.create(bottle)
+        let reference = try await stack.savePhoto(
+            Data("exclusive".utf8),
+            fileExtension: "jpg",
+            for: bottle.id
+        )
+
+        try await stack.deleteBottle(id: bottle.id)
+
+        let deletedBottle = try await stack.repository.bottle(id: bottle.id)
+        XCTAssertNil(deletedBottle)
+        await XCTAssertThrowsPhotoError(
+            try await stack.photos.data(for: reference),
+            .photoNotFound
+        )
+    }
+
+    func testStackDeleteBottlePreservesPhotosReferencedByAnotherBottle() async throws {
+        let (stack, root) = try makeStack()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = try Bottle(name: "First", quantity: 1, storageLocation: "Rack")
+        try await stack.repository.create(first)
+        let sharedReference = try await stack.savePhoto(
+            Data("shared".utf8),
+            fileExtension: "jpg",
+            for: first.id
+        )
+        let second = try Bottle(
+            name: "Second",
+            quantity: 1,
+            storageLocation: "Rack",
+            photos: [sharedReference]
+        )
+        try await stack.repository.create(second)
+
+        try await stack.deleteBottle(id: first.id)
+
+        let retainedBottle = try await stack.repository.bottle(id: second.id)
+        let retainedData = try await stack.photos.data(for: sharedReference)
+        XCTAssertEqual(retainedBottle?.photos, [sharedReference])
+        XCTAssertEqual(retainedData, Data("shared".utf8))
+
+        try await stack.deleteBottle(id: second.id)
+        await XCTAssertThrowsPhotoError(
+            try await stack.photos.data(for: sharedReference),
+            .photoNotFound
+        )
+    }
+
+    func testStackDeleteBottleReportsUnsafePhotoCleanupAfterCommittedDeletion() async throws {
+        let (stack, root) = try makeStack()
+        let outside = root.deletingLastPathComponent()
+            .appendingPathComponent("outside-\(UUID().uuidString).jpg")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: outside)
+        }
+        let outsideData = Data("outside-must-survive".utf8)
+        try outsideData.write(to: outside)
+        let bottle = try Bottle(name: "Cleanup", quantity: 1, storageLocation: "Rack")
+        try await stack.repository.create(bottle)
+        let reference = try await stack.savePhoto(
+            Data("label".utf8),
+            fileExtension: "jpg",
+            for: bottle.id
+        )
+        let photoURL = root.appendingPathComponent(reference.path)
+        try FileManager.default.removeItem(at: photoURL)
+        try FileManager.default.createSymbolicLink(at: photoURL, withDestinationURL: outside)
+
+        let result = try await stack.deleteBottle(id: bottle.id)
+
+        let deletedBottle = try await stack.repository.bottle(id: bottle.id)
+        let preservedOutsideData = try Data(contentsOf: outside)
+        XCTAssertNil(deletedBottle)
+        XCTAssertEqual(result.pendingPhotoCleanup, [reference])
+        XCTAssertEqual(preservedOutsideData, outsideData)
+
+        let recovered = try await stack.garbageCollectOrphanPhotos()
+        let outsideDataAfterRecovery = try Data(contentsOf: outside)
+        XCTAssertEqual(recovered, [reference])
+        XCTAssertEqual(outsideDataAfterRecovery, outsideData)
+    }
+
     func testReplacingDatabaseFileWithPlainFileBlocksRepositoryAccess() async throws {
         let (stack, root) = try makeStack()
         defer { try? FileManager.default.removeItem(at: root) }

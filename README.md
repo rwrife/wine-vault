@@ -112,17 +112,25 @@ data layer or navigation model.
 
 ## Current status and milestones
 
-The XcodeGen-driven app target retains its iOS 26 SDK requirement. The pure
-Domain package now defines validated inventory and valuation values plus
-collection summaries. A separate Data package owns versioned GRDB/SQLite
-persistence and app-private photo files. The app constructs that data stack
-under Application Support at launch; collection UI remains a later milestone.
-No networking, cloud, telemetry, or secret access exists in either package.
+The XcodeGen-driven app target retains its iOS 26 SDK requirement. The app now
+provides the local add/browse/search/filter/edit/delete workflow over the GRDB
+repository, with optional camera-only label capture into the existing private
+photo store. Compact width uses stacked navigation and regular width keeps the
+browser and detail visible. No networking, accounts, cloud, telemetry, Photo
+Library permission, or secret access is used by this workflow.
+Deletion is permanent after confirmation and also removes that bottle's
+cascading valuation history; undo is intentionally not offered because it
+could not faithfully restore those quotes. App-stack deletion also removes
+private photo files that no remaining bottle references while preserving any
+shared photo reference. If filesystem safety checks prevent post-delete photo
+cleanup, the deletion remains committed, the app reports a cleanup warning,
+and explicit orphan garbage collection remains available for recovery.
 
 - [x] M0: README/PLAN, issue backlog, executor cron
 - [ ] M1: project skeleton, CI, local data layer (source implemented; each PR's
   hosted iOS 26 CI gates acceptance)
-- [ ] M2: add/browse/edit bottles (core workflow)
+- [x] M2: add/browse/edit bottles (source and tests implemented; hosted iOS
+  evidence remains required as described below)
 - [ ] M3: opt-in price lookup + collection valuation
 - [ ] M4: dashboards, drink-by reminders, adaptive tablet layout
 - [ ] M5: export/backup/restore, TestFlight release
@@ -149,6 +157,8 @@ open WineVault.xcodeproj     # scheme: WineVault
   warnings-as-errors, and LLVM source coverage. Pull requests archive the
   `domain.lcov` and `data.lcov` artifacts produced by those runs after CI
   verifies an `SF` entry for every package source file.
+- Native CI keeps build/test result bundles, raw logs, and bounded simulator
+  diagnostics for 14 days, including failures.
 - Lint: `swiftlint --strict --config .swiftlint.yml Packages/WineVaultDomain Packages/WineVaultData`
 - Release path: GitHub Actions → App Store Connect API (secrets above) →
   TestFlight. See PLAN.md.
@@ -164,6 +174,7 @@ WineVault/                   App target
   Domain/ Data/ Services/    Layers (populated by later milestones)
   UI/                        SwiftUI views
 WineVaultTests/              App-host unit tests
+WineVaultUITests/            Add/list/search/edit/delete + adaptive UI tests
 .github/workflows/ci.yml     Domain/Data (Linux) + coverage + lint + iOS 26 gate
 ```
 
@@ -201,6 +212,22 @@ Collection count functions are pure throwing functions: they report
 not fit in `Int`. `ValuationQuote` values are immutable and validate finite
 nonnegative amounts plus nonblank currency, source, and query provenance during
 both construction and decoding.
+
+## Issue #3 acceptance evidence
+
+| Acceptance item | Source/test status | Evidence status on this Linux worktree |
+|---|---|---|
+| Complete add/edit form, stepper, tags, inline labeled validation | Implemented; domain tests cover normalization, invalid fields, identity, and photo preservation | Domain tests runnable in Swift Docker |
+| Optional camera, rationale, usage description, manual fallback, no Photo Library permission | Camera-only capture writes through `WineVaultDataStack.savePhoto`; denied/unavailable states keep the form usable | **BLOCKED-NOT-DONE:** needs a real device/simulator permission check |
+| Browse fields, search, and region/grape/tag/drink-by filters | Implemented; domain tests cover search, composed filters, drink-by injection, and facets | Domain behavior is Linux-testable; rendered UI needs iOS evidence |
+| Confirmed permanent deletion | Implemented; confirmation states that the bottle and cascading valuation history are deleted | **BLOCKED-NOT-DONE:** app-host execution needs Xcode 26 |
+| Empty states, compact stack, regular split, Dynamic Type AX5, VoiceOver labels | Implemented with adaptive system SwiftUI controls and no fixed text sizes | **BLOCKED-NOT-DONE:** requires manual AX5/VoiceOver and size-class checks; no accessibility claim is made yet |
+| XCUITest add → list → search → edit → delete | Added to `WineVaultUITests`, the generated scheme, and the iOS 26 CI invocation | **BLOCKED-NOT-DONE locally:** Linux has no Xcode/iOS simulator; hosted CI must provide evidence |
+
+This matrix deliberately distinguishes implemented source from platform
+verification. Camera, VoiceOver, AX5 layout, compact navigation, and the
+regular-width split remain incomplete until real CI/device evidence is
+recorded; Linux package success is not treated as substitute evidence.
 
 ## License
 
