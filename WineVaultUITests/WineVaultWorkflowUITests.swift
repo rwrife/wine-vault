@@ -51,13 +51,15 @@ final class WineVaultWorkflowUITests: XCTestCase {
 
         openBottle(named: "Estate Reserve Edited")
         app.buttons["deleteBottleButton"].tap()
-        let identifiedDelete = app.buttons["confirmDeleteButton"]
-        if identifiedDelete.waitForExistence(timeout: 1) {
-            identifiedDelete.tap()
-        } else {
-            app.alerts.buttons["Delete"].tap()
-        }
+        let alert = app.alerts.firstMatch
+        let alertAppeared = alert.waitForExistence(timeout: 3)
+        XCTAssertTrue(alertAppeared)
+        // The SwiftUI alert's Delete button is uniquely labeled inside the
+        // alert itself; the accessibility identifier can propagate to
+        // several system nodes and must not be queried app-wide.
+        alert.buttons["Delete"].firstMatch.tap()
 
+        returnToCollectionIfNeeded()
         let emptyStateExists = app.staticTexts["Your collection is empty"].waitForExistence(timeout: 5)
         XCTAssertTrue(emptyStateExists)
     }
