@@ -149,6 +149,10 @@ final class WineVaultWorkflowUITests: XCTestCase {
             field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
         }
         field.typeText(text)
+        // Press the keyboard's Done key (the name field uses submitLabel(.done))
+        // so the keyboard is deterministically dismissed before the next control
+        // is scrolled into view; a lingering keyboard makes form swipes miss.
+        field.typeText(XCUIKeyboardKey.return.rawValue)
     }
 
     @MainActor

@@ -65,6 +65,7 @@ struct BottleFormView: View {
         Section("Identity") {
             TextField("Name", text: $form.name)
                 .textContentType(.name)
+                .submitLabel(.done)
                 .accessibilityIdentifier("bottleNameField")
             validation(.nameRequired)
             TextField("Producer", text: $form.producer)
