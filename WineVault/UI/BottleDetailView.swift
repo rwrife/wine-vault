@@ -126,7 +126,7 @@ struct BottleDetailView: View {
 }
 
 func candidateSummary(_ candidate: PriceCandidate) -> Text {
-    let price = candidate.amount.formatted(.currency(code: CurrencyCode(stringIdentifier: candidate.currency)))
+    let price = candidate.amount.formatted(.currency(code: candidate.currency))
     let day = candidate.quoteDate.formatted(date: .abbreviated, time: .omitted)
     return Text("\(price) — \(candidate.source), quoted \(day)")
 }

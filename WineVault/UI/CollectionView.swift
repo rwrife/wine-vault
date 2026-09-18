@@ -131,7 +131,7 @@ struct CollectionView: View {
     private var valuationFooter: some View {
         let valuation = store.collectionValuation
         VStack(alignment: .leading, spacing: 4) {
-            Text("Estimated collection value: \(valuation.total.formatted(.currency(code: CurrencyCode(stringIdentifier: valuation.baseCurrency))))")
+            Text("Estimated collection value: \(valuation.total.formatted(.currency(code: valuation.baseCurrency)))")
                 .accessibilityIdentifier("collectionValuationTotal")
             Text(valuation.coverageDescription)
                 .font(.footnote)
