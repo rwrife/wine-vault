@@ -278,6 +278,8 @@ private struct RefreshFailingRepository: BottleRepository {
     func quotes(bottleID: UUID) async throws -> [ValuationQuote] {
         try await base.quotes(bottleID: bottleID)
     }
+    func deleteQuote(id: UUID) async throws { try await base.deleteQuote(id: id) }
+    func allQuotes() async throws -> [ValuationQuote] { try await base.allQuotes() }
 }
 
 private enum TestRepositoryError: Error {
@@ -310,6 +312,14 @@ private struct FailingBottleRepository: BottleRepository {
     }
 
     func quotes(bottleID: UUID) async throws -> [ValuationQuote] {
+        throw TestRepositoryError.unavailable
+    }
+
+    func deleteQuote(id: UUID) async throws {
+        throw TestRepositoryError.unavailable
+    }
+
+    func allQuotes() async throws -> [ValuationQuote] {
         throw TestRepositoryError.unavailable
     }
 }

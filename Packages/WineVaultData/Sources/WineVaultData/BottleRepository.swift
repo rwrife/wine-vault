@@ -18,6 +18,8 @@ public protocol BottleRepository: Sendable {
     func deleteBottle(id: UUID) async throws
     func createQuote(_ quote: ValuationQuote) async throws
     func quotes(bottleID: UUID) async throws -> [ValuationQuote]
+    func deleteQuote(id: UUID) async throws
+    func allQuotes() async throws -> [ValuationQuote]
 }
 
 public actor SQLiteBottleRepository: BottleRepository {
@@ -112,6 +114,18 @@ public actor SQLiteBottleRepository: BottleRepository {
     public func quotes(bottleID: UUID) async throws -> [ValuationQuote] {
         try await coordinator.withExclusiveAccess {
             try await self.quotesWithoutCoordination(bottleID: bottleID)
+        }
+    }
+
+    public func deleteQuote(id: UUID) async throws {
+        try await coordinator.withExclusiveAccess {
+            try await self.deleteQuoteWithoutCoordination(id: id)
+        }
+    }
+
+    public func allQuotes() async throws -> [ValuationQuote] {
+        try await coordinator.withExclusiveAccess {
+            try await self.allQuotesWithoutCoordination()
         }
     }
 
@@ -216,6 +230,26 @@ public actor SQLiteBottleRepository: BottleRepository {
                     """,
                 arguments: [bottleID.uuidString]
             ).map(decodeQuote)
+        }
+    }
+
+    func allQuotesWithoutCoordination() throws -> [ValuationQuote] {
+        try validateStorageLocation()
+        return try database.read { database in
+            try Row.fetchAll(
+                database,
+                sql: "SELECT * FROM valuationQuotes ORDER BY bottleID, quoteDate, id"
+            ).map(decodeQuote)
+        }
+    }
+
+    func deleteQuoteWithoutCoordination(id: UUID) throws {
+        try validateStorageLocation()
+        try database.write { database in
+            try database.execute(
+                sql: "DELETE FROM valuationQuotes WHERE id = ?",
+                arguments: [id.uuidString]
+            )
         }
     }
 
