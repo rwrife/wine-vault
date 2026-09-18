@@ -25,7 +25,7 @@ struct WineVaultApp: App {
     /// The UI-test launch only ever talks to the deterministic fixture —
     /// never the network. `--ui-testing-price=<mode>` scripts the behavior:
     /// ok (default), no-results, timeout, or disabled.
-    private static func uiTestPriceProvider() -> any PriceProviding {
+    nonisolated private static func uiTestPriceProvider() -> any PriceProviding {
         let arguments = ProcessInfo.processInfo.arguments
         let mode = arguments.first { $0.hasPrefix("--ui-testing-price=") }
             .map { String($0.dropFirst("--ui-testing-price=".count)) } ?? "ok"
