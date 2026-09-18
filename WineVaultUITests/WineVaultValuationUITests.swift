@@ -98,6 +98,13 @@ final class WineVaultValuationUITests: XCTestCase {
         // No results: the sheet explains and offers the manual fallback.
         let fallback = app.buttons["manualFallbackFromLookupButton"]
         let fallbackShown = fallback.waitForExistence(timeout: 10)
+        if !fallbackShown {
+            // Ship the failure evidence into the CI console log: the
+            // xcresult attachment is not readable from Linux triage.
+            print("HIERARCHY-DUMP-BEGIN estimateValue no-results sheet")
+            print(app.debugDescription)
+            print("HIERARCHY-DUMP-END")
+        }
         XCTAssertTrue(fallbackShown)
         fallback.tap()
 
