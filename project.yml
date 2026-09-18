@@ -37,6 +37,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.infinityball.winevault
         PRODUCT_NAME: WineVault
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
