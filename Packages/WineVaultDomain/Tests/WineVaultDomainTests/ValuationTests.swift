@@ -71,19 +71,19 @@ final class ValuationTests: XCTestCase {
     }
 
     func testCollectionValuationUsesNewestPerBottleAndStatesCoverage() throws {
-        let a = try bottle("A")
-        let b = try bottle("B")
+        let alpha = try bottle("A")
+        let beta = try bottle("B")
         let unvalued = try bottle("C")
         let quotesByBottle: [UUID: [ValuationQuote]] = [
-            a.id: [
-                try quote(bottleID: a.id, amount: 10, daysBefore: 100),
-                try quote(bottleID: a.id, amount: 30, daysBefore: 1),
+            alpha.id: [
+                try quote(bottleID: alpha.id, amount: 10, daysBefore: 100),
+                try quote(bottleID: alpha.id, amount: 30, daysBefore: 1),
             ],
-            b.id: [try quote(bottleID: b.id, amount: 5, daysBefore: 0)],
+            beta.id: [try quote(bottleID: beta.id, amount: 5, daysBefore: 0)],
         ]
 
         let valuation = collectionValuation(
-            bottles: [a, b, unvalued],
+            bottles: [alpha, beta, unvalued],
             quotesByBottle: quotesByBottle,
             reference: base,
             calendar: utc
@@ -103,13 +103,13 @@ final class ValuationTests: XCTestCase {
     }
 
     func testCurrencyMismatchExcludedFromTotalButCountedAsValued() throws {
-        let a = try bottle("A")
-        let b = try bottle("B")
+        let alpha = try bottle("A")
+        let beta = try bottle("B")
         let valuation = collectionValuation(
-            bottles: [a, b],
+            bottles: [alpha, beta],
             quotesByBottle: [
-                a.id: [try quote(bottleID: a.id, amount: 40, currency: "EUR", daysBefore: 1)],
-                b.id: [try quote(bottleID: b.id, amount: 12, daysBefore: 1)],
+                alpha.id: [try quote(bottleID: alpha.id, amount: 40, currency: "EUR", daysBefore: 1)],
+                beta.id: [try quote(bottleID: beta.id, amount: 12, daysBefore: 1)],
             ],
             reference: base,
             calendar: utc
@@ -120,10 +120,10 @@ final class ValuationTests: XCTestCase {
     }
 
     func testStaleQuotesCountedInTotalButReported() throws {
-        let a = try bottle("A")
+        let alpha = try bottle("A")
         let valuation = collectionValuation(
-            bottles: [a],
-            quotesByBottle: [a.id: [try quote(bottleID: a.id, amount: 99, daysBefore: 200)]],
+            bottles: [alpha],
+            quotesByBottle: [alpha.id: [try quote(bottleID: alpha.id, amount: 99, daysBefore: 200)]],
             reference: base,
             calendar: utc
         )
