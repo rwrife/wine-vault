@@ -144,17 +144,26 @@ private struct EstimateMatchView: View {
                 if store.isLookingUpPrice {
                     ProgressView("Asking the price service…")
                 } else if let error = store.errorMessage, store.lookupCandidates.isEmpty {
-                    ContentUnavailableView {
+                    // Plain VStack instead of ContentUnavailableView: the
+                    // actions button must reliably carry its accessibility
+                    // identifier for the fallback UI test.
+                    VStack(spacing: 12) {
                         Label("No estimate yet", systemImage: "exclamationmark.triangle")
-                    } description: {
+                            .font(.title3)
                         Text(error)
-                    } actions: {
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .accessibilityIdentifier("estimateErrorMessage")
                         Button("Enter price manually") {
                             store.errorMessage = nil
                             dismiss()
                         }
+                        .buttonStyle(.borderedProminent)
                         .accessibilityIdentifier("manualFallbackFromLookupButton")
                     }
+                    .padding()
+                    .accessibilityIdentifier("estimateErrorState")
                 } else {
                     List {
                         Section {

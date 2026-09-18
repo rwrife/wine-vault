@@ -110,12 +110,6 @@ struct CollectionView: View {
         .searchable(text: $store.criteria.searchText, prompt: "Name, producer, or region")
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Button("Estimate value", systemImage: "tag") {
-                    showingCollectionEstimate = true
-                    Task { await store.startCollectionEstimate() }
-                }
-                .accessibilityIdentifier("collectionEstimateButton")
-                .disabled(store.bottles.isEmpty)
                 Button("Filter", systemImage: filterSystemImage) {
                     showingFilters = true
                 }
@@ -131,6 +125,12 @@ struct CollectionView: View {
     private var valuationFooter: some View {
         let valuation = store.collectionValuation
         VStack(alignment: .leading, spacing: 4) {
+            Button("Estimate value") {
+                showingCollectionEstimate = true
+                Task { await store.startCollectionEstimate() }
+            }
+            .accessibilityIdentifier("collectionEstimateButton")
+            .disabled(store.bottles.isEmpty)
             Text("Estimated collection value: \(valuation.total.formatted(.currency(code: valuation.baseCurrency)))")
                 .accessibilityIdentifier("collectionValuationTotal")
             Text(valuation.coverageDescription)

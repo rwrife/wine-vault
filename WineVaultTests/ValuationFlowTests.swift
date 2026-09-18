@@ -73,7 +73,13 @@ final class ValuationFlowTests: XCTestCase {
         XCTAssertEqual(quote.amount, candidate.amount)
         XCTAssertEqual(quote.currency, "USD")
         XCTAssertEqual(quote.source, "CellarTrace Fixture")
-        XCTAssertEqual(quote.quoteDate, candidate.quoteDate)
+        // Stored as a Unix-time double: the round-trip is only exact to the
+        // microsecond, so compare with a tolerance, not bit equality.
+        XCTAssertEqual(
+            quote.quoteDate.timeIntervalSince1970,
+            candidate.quoteDate.timeIntervalSince1970,
+            accuracy: 0.001
+        )
         // Exact query text is preserved verbatim for provenance.
         XCTAssertEqual(quote.query, "Estate Reserve Maison")
         XCTAssertEqual(store.latestQuote(for: bottle.id)?.id, quote.id)
@@ -240,8 +246,10 @@ final class ValuationFlowTests: XCTestCase {
 
     func testCollectionEstimateSkipLeavesBottleUnvalued() async throws {
         let (store, _) = try await makeStore()
-        let first = try await addBottle(to: store, name: "Skip Me")
-        let second = try await addBottle(to: store, name: "Keep Me")
+        // Names are chosen so the repository's name ordering matches the
+        // expected queue order ("Alpha" sorts before "Beta").
+        let first = try await addBottle(to: store, name: "Alpha Skip")
+        let second = try await addBottle(to: store, name: "Beta Keep")
 
         await store.startCollectionEstimate()
         await store.skipLookup()
