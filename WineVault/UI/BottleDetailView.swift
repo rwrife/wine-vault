@@ -94,8 +94,10 @@ struct BottleDetailView: View {
                     .foregroundStyle(.secondary)
             }
             Button("Estimate value") {
+                // Presentation only — starting the lookup in the same turn
+                // races with the sheet transition and can drop the
+                // presentation entirely. EstimateMatchView launches it.
                 showingEstimate = true
-                Task { await store.requestPriceLookup(for: bottle) }
             }
             .accessibilityIdentifier("estimateValueButton")
             .disabled(store.isLookingUpPrice)
@@ -192,6 +194,11 @@ private struct EstimateMatchView: View {
             }
             .navigationTitle("Estimate value")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                // Launch the user-initiated lookup once the sheet is on
+                // screen, never during the presentation transition.
+                await store.requestPriceLookup(for: bottle)
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

@@ -7,6 +7,7 @@ import WineVaultDomain
 struct CollectionEstimateView: View {
     @ObservedObject var store: InventoryStore
     @Environment(\.dismiss) private var dismiss
+    @State private var runStarted = false
 
     private var currentBottle: Bottle? {
         store.collectionLookupQueue.first
@@ -17,6 +18,9 @@ struct CollectionEstimateView: View {
             Group {
                 if let bottle = currentBottle {
                     content(for: bottle)
+                } else if !runStarted {
+                    ProgressView("Preparing estimate…")
+                        .accessibilityIdentifier("collectionEstimatePreparing")
                 } else {
                     ContentUnavailableView {
                         Label("Estimate finished", systemImage: "checkmark.circle")
@@ -33,6 +37,11 @@ struct CollectionEstimateView: View {
             }
             .navigationTitle("Estimating collection")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                guard !runStarted else { return }
+                runStarted = true
+                await store.startCollectionEstimate()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Stop") {

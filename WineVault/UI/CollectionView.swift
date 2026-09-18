@@ -126,8 +126,10 @@ struct CollectionView: View {
         let valuation = store.collectionValuation
         VStack(alignment: .leading, spacing: 4) {
             Button("Estimate value") {
+                // Presentation only; CollectionEstimateView starts the run
+                // after the sheet is on screen so the sheet transition and
+                // published-state updates never race each other.
                 showingCollectionEstimate = true
-                Task { await store.startCollectionEstimate() }
             }
             .accessibilityIdentifier("collectionEstimateButton")
             .disabled(store.bottles.isEmpty)
