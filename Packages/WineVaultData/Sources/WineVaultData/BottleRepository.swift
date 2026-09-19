@@ -18,17 +18,19 @@ public protocol BottleRepository: Sendable {
     func deleteBottle(id: UUID) async throws
     func createQuote(_ quote: ValuationQuote) async throws
     func quotes(bottleID: UUID) async throws -> [ValuationQuote]
+    func deleteQuote(id: UUID) async throws
+    func allQuotes() async throws -> [ValuationQuote]
 }
 
 public actor SQLiteBottleRepository: BottleRepository {
-    private let database: DatabaseQueue
-    private let coordinator: DataAccessCoordinator
-    private let guardedRootDirectory: URL?
-    private let canonicalRootDirectory: URL?
-    private let rootIdentity: FileIdentity?
-    private let databaseURL: URL?
-    private let databaseIdentity: FileIdentity?
-    private let photoStore: PhotoStore?
+    let database: DatabaseQueue
+    let coordinator: DataAccessCoordinator
+    let guardedRootDirectory: URL?
+    let canonicalRootDirectory: URL?
+    let rootIdentity: FileIdentity?
+    let databaseURL: URL?
+    let databaseIdentity: FileIdentity?
+    let photoStore: PhotoStore?
 
     public init(databaseURL: URL) throws {
         let storage = try Self.makePersistentStorage(databaseURL: databaseURL)
@@ -103,18 +105,6 @@ public actor SQLiteBottleRepository: BottleRepository {
         }
     }
 
-    public func createQuote(_ quote: ValuationQuote) async throws {
-        try await coordinator.withExclusiveAccess {
-            try await self.createQuoteWithoutCoordination(quote)
-        }
-    }
-
-    public func quotes(bottleID: UUID) async throws -> [ValuationQuote] {
-        try await coordinator.withExclusiveAccess {
-            try await self.quotesWithoutCoordination(bottleID: bottleID)
-        }
-    }
-
     func createWithoutCoordination(_ bottle: Bottle) throws {
         try validateStorageLocation()
         try database.write { database in
@@ -185,40 +175,6 @@ public actor SQLiteBottleRepository: BottleRepository {
         }
     }
 
-    func createQuoteWithoutCoordination(_ quote: ValuationQuote) throws {
-        try validateStorageLocation()
-        try database.write { database in
-            try database.execute(
-                sql: """
-                    INSERT INTO valuationQuotes
-                        (id, bottleID, quoteDate, amount, currency, source, retrievedAt, query)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                arguments: [
-                    quote.id.uuidString, quote.bottleID.uuidString,
-                    quote.quoteDate.timeIntervalSince1970,
-                    NSDecimalNumber(decimal: quote.amount).stringValue,
-                    quote.currency, quote.source, quote.retrievedAt.timeIntervalSince1970,
-                    quote.query,
-                ]
-            )
-        }
-    }
-
-    func quotesWithoutCoordination(bottleID: UUID) throws -> [ValuationQuote] {
-        try validateStorageLocation()
-        return try database.read { database in
-            try Row.fetchAll(
-                database,
-                sql: """
-                    SELECT * FROM valuationQuotes
-                    WHERE bottleID = ? ORDER BY quoteDate, id
-                    """,
-                arguments: [bottleID.uuidString]
-            ).map(decodeQuote)
-        }
-    }
-
     func photoReferencesWithoutCoordination() throws -> Set<PhotoReference> {
         try validateStorageLocation()
         return try database.read { database in
@@ -263,21 +219,7 @@ public actor SQLiteBottleRepository: BottleRepository {
         }
     }
 
-    func unsafeTestInsertQuote(bottleID: UUID, amount: String, source: String) throws {
-        try validateStorageLocation()
-        try database.write { database in
-            try database.execute(
-                sql: """
-                    INSERT INTO valuationQuotes
-                        (id, bottleID, quoteDate, amount, currency, source, retrievedAt, query)
-                    VALUES (?, ?, 0, ?, 'USD', ?, 0, 'Wine')
-                    """,
-                arguments: [UUID().uuidString, bottleID.uuidString, amount, source]
-            )
-        }
-    }
-
-    private func validateStorageLocation() throws {
+    func validateStorageLocation() throws {
         guard let guardedRootDirectory,
               let canonicalRootDirectory,
               let rootIdentity,
@@ -339,28 +281,6 @@ private func decodeBottle(_ row: Row) throws -> Bottle {
         photos: try decode([PhotoReference].self, from: row["photos"]),
         notes: row["notes"]
     )
-}
-
-private func decodeQuote(_ row: Row) throws -> ValuationQuote {
-    guard let id = UUID(uuidString: row["id"]),
-          let bottleID = UUID(uuidString: row["bottleID"]),
-          let amount = Decimal(string: row["amount"], locale: Locale(identifier: "en_US_POSIX")) else {
-        throw RepositoryError.invalidStoredValue
-    }
-    do {
-        return try ValuationQuote(
-            id: id,
-            bottleID: bottleID,
-            quoteDate: Date(timeIntervalSince1970: row["quoteDate"]),
-            amount: amount,
-            currency: row["currency"],
-            source: row["source"],
-            retrievedAt: Date(timeIntervalSince1970: row["retrievedAt"]),
-            query: row["query"]
-        )
-    } catch {
-        throw RepositoryError.invalidStoredValue
-    }
 }
 
 private func encode<T: Encodable>(_ value: T) throws -> String {

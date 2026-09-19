@@ -9,6 +9,7 @@ struct CollectionView: View {
     @State private var showingFilters = false
     @State private var editingBottle: Bottle?
     @State private var pendingDeletion: Bottle?
+    @State private var showingCollectionEstimate = false
 
     var body: some View {
         NavigationSplitView {
@@ -37,6 +38,9 @@ struct CollectionView: View {
         }
         .sheet(isPresented: $showingFilters) {
             BottleFiltersView(store: store)
+        }
+        .sheet(isPresented: $showingCollectionEstimate) {
+            CollectionEstimateView(store: store)
         }
         .alert("Delete \(pendingDeletion?.name ?? "bottle")?", isPresented: deletionPresented) {
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
@@ -95,6 +99,9 @@ struct CollectionView: View {
                             Button("Delete", role: .destructive) { pendingDeletion = bottle }
                         }
                     }
+                    Section {
+                        valuationFooter
+                    }
                 }
                 .accessibilityIdentifier("bottleList")
             }
@@ -112,6 +119,45 @@ struct CollectionView: View {
             }
         }
         .refreshable { await store.load() }
+    }
+
+    @ViewBuilder
+    private var valuationFooter: some View {
+        let valuation = store.collectionValuation
+        VStack(alignment: .leading, spacing: 4) {
+            Button("Estimate value") {
+                // Presentation only; CollectionEstimateView starts the run
+                // after the sheet is on screen so the sheet transition and
+                // published-state updates never race each other.
+                showingCollectionEstimate = true
+            }
+            .accessibilityIdentifier("collectionEstimateButton")
+            .disabled(store.bottles.isEmpty)
+            Text("Estimated collection value: \(valuation.total.formatted(.currency(code: valuation.baseCurrency)))")
+                .accessibilityIdentifier("collectionValuationTotal")
+            Text(valuation.coverageDescription)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("collectionValuationCoverage")
+            if valuation.excludedCurrencyMismatchCount > 0 {
+                Text(
+                    "\(valuation.excludedCurrencyMismatchCount) valued bottle(s) priced in another "
+                        + "currency and excluded from the \(valuation.baseCurrency) total."
+                )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("collectionValuationMismatch")
+            }
+            if valuation.staleQuoteCount > 0 {
+                Text("\(valuation.staleQuoteCount) newest quote(s) are over 90 days old.")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("collectionValuationStale")
+            }
+            Text("Estimates from dated quotes — not an authoritative valuation.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var selectedBottle: Bottle? {

@@ -5,6 +5,7 @@ public enum DomainValidationError: Error, Equatable, Sendable {
     case unsafePhotoReference
     case invalidQuoteAmount
     case missingQuoteProvenance
+    case emptyPriceQuery
 }
 
 /// A validated path below the app-private photo directory.
