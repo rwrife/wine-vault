@@ -165,7 +165,10 @@ private struct EstimateMatchView: View {
                         .accessibilityIdentifier("manualFallbackFromLookupButton")
                     }
                     .padding()
-                    .accessibilityIdentifier("estimateErrorState")
+                    // NOTE: no accessibilityIdentifier on this container —
+                    // on iOS 26 the container identifier propagates onto the
+                    // child elements and shadows the fallback button's own
+                    // `manualFallbackFromLookupButton` identifier.
                 } else {
                     List {
                         Section {
