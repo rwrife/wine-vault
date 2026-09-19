@@ -123,7 +123,7 @@ final class ValuationFlowTests: XCTestCase {
 
         await store.requestPriceLookup(for: bottle)
 
-        let message = try XCTUnwrap(store.errorMessage)
+        let message = try XCTUnwrap(store.lookupMessage)
         XCTAssertTrue(message.localizedCaseInsensitiveContains("timed out"))
         XCTAssertTrue(store.lookupCandidates.isEmpty)
         // Offline fallback still works with no network answer.
@@ -138,8 +138,33 @@ final class ValuationFlowTests: XCTestCase {
 
         await store.requestPriceLookup(for: bottle)
 
-        let message = try XCTUnwrap(store.errorMessage)
+        let message = try XCTUnwrap(store.lookupMessage)
         XCTAssertTrue(message.localizedCaseInsensitiveContains("No price matches"))
+    }
+
+    /// Regression for the CI sheet-cancel race: lookup outcomes must never
+    /// write `errorMessage`, because the collection-level error alert competes
+    /// with the estimate sheet's presentation and can cancel it entirely.
+    func testLookupOutcomesNeverRaiseTheGlobalErrorChannel() async throws {
+        for behavior in [
+            FixturePriceProvider.Behavior.noResults,
+            .timeout,
+            .disabled,
+        ] {
+            let (store, _) = try await makeStore(provider: FixturePriceProvider(behavior: behavior))
+            let bottle = try await addBottle(to: store, name: "Channel Guard")
+
+            await store.requestPriceLookup(for: bottle)
+
+            XCTAssertNotNil(
+                store.lookupMessage,
+                "behavior \(behavior) should surface guidance via lookupMessage"
+            )
+            XCTAssertNil(
+                store.errorMessage,
+                "behavior \(behavior) must not raise the global error alert channel"
+            )
+        }
     }
 
     func testDisabledProviderDoesNotPretendToLookUp() async throws {
@@ -148,7 +173,7 @@ final class ValuationFlowTests: XCTestCase {
 
         await store.requestPriceLookup(for: bottle)
 
-        let message = try XCTUnwrap(store.errorMessage)
+        let message = try XCTUnwrap(store.lookupMessage)
         XCTAssertTrue(message.localizedCaseInsensitiveContains("turned off"))
         XCTAssertTrue(store.lookupCandidates.isEmpty)
     }
@@ -160,7 +185,7 @@ final class ValuationFlowTests: XCTestCase {
 
         await store.requestPriceLookup(for: bottle)
 
-        let message = try XCTUnwrap(store.errorMessage)
+        let message = try XCTUnwrap(store.lookupMessage)
         XCTAssertTrue(message.localizedCaseInsensitiveContains("not enabled"))
     }
 
@@ -319,7 +344,8 @@ final class ValuationFlowTests: XCTestCase {
         await store.startCollectionEstimate()
 
         XCTAssertFalse(store.isCollectionLookupActive)
-        XCTAssertNotNil(store.errorMessage)
+        XCTAssertNotNil(store.lookupMessage)
+        XCTAssertNil(store.errorMessage)
     }
 }
 

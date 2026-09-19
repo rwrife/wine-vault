@@ -56,6 +56,12 @@ final class InventoryStore: ObservableObject {
     @Published private(set) var isSaving = false
     @Published var errorMessage: String?
     @Published var cleanupWarningMessage: String?
+    /// Lookup-outcome guidance (no matches, timeout, provider off, …) shown
+    /// inside the estimate sheets. Deliberately separate from `errorMessage`:
+    /// the collection-level error alert competes with sheet presentations on
+    /// iOS 26 and can cancel the estimate sheet entirely, so lookup results
+    /// must never drive it.
+    @Published var lookupMessage: String?
 
     // MARK: - Valuation state (issue #4)
 
@@ -189,12 +195,12 @@ final class InventoryStore: ObservableObject {
     /// the per-bottle candidate flow. Nothing is applied without a tap.
     func startCollectionEstimate() async {
         guard dependencies.priceProvider != nil else {
-            errorMessage = "Price lookup is not enabled. You can still enter prices manually."
+            lookupMessage = "Price lookup is not enabled. You can still enter prices manually."
             return
         }
         let queue = bottles.filter { latestQuote(for: $0.id) == nil }
         guard !queue.isEmpty else {
-            errorMessage = "Every bottle already has a price on record. Re-estimate from each bottle to refresh."
+            lookupMessage = "Every bottle already has a price on record. Re-estimate from each bottle to refresh."
             return
         }
         isCollectionLookupMode = true
@@ -217,7 +223,7 @@ final class InventoryStore: ObservableObject {
         if let next = collectionLookupQueue.first {
             lookupCandidates = []
             pendingManualMatch = nil
-            errorMessage = nil
+            lookupMessage = nil
             await requestPriceLookup(for: next)
         } else {
             endCollectionEstimate()
@@ -238,7 +244,7 @@ final class InventoryStore: ObservableObject {
     /// one bottle at a time.
     func requestPriceLookup(for bottle: Bottle) async {
         guard let priceProvider = dependencies.priceProvider else {
-            errorMessage = "Price lookup is not enabled. You can still enter a price manually."
+            lookupMessage = "Price lookup is not enabled. You can still enter a price manually."
             return
         }
         guard !isLookingUpPrice else { return }
@@ -248,7 +254,7 @@ final class InventoryStore: ObservableObject {
             let query = try priceQuery(for: bottle)
             let candidates = try await priceProvider.priceCandidates(for: query)
             guard !candidates.isEmpty else {
-                errorMessage = "The price service returned no matches for “\(query.text)”. You can still enter a price manually."
+                lookupMessage = "The price service returned no matches for “\(query.text)”. You can still enter a price manually."
                 lookupCandidates = []
                 lookupBottleID = nil
                 return
@@ -256,22 +262,22 @@ final class InventoryStore: ObservableObject {
             lookupCandidates = candidates
             lookupBottleID = bottle.id
             pendingManualMatch = nil
-            errorMessage = nil
+            lookupMessage = nil
         } catch let error as PriceProviderError {
             lookupCandidates = []
             lookupBottleID = nil
             switch error {
             case .disabled:
-                errorMessage = "Price lookup is turned off. You can still enter a price manually."
+                lookupMessage = "Price lookup is turned off. You can still enter a price manually."
             case .timedOut:
-                errorMessage = "The price lookup timed out. Try again, or enter a price manually."
+                lookupMessage = "The price lookup timed out. Try again, or enter a price manually."
             case .noResults:
-                errorMessage = "No price matches for “\(bottle.name)”. You can still enter a price manually."
+                lookupMessage = "No price matches for “\(bottle.name)”. You can still enter a price manually."
             }
         } catch {
             lookupCandidates = []
             lookupBottleID = nil
-            errorMessage = "The price lookup could not complete. You can still enter a price manually."
+            lookupMessage = "The price lookup could not complete. You can still enter a price manually."
         }
     }
 
@@ -282,6 +288,7 @@ final class InventoryStore: ObservableObject {
         lookupCandidates = []
         lookupBottleID = nil
         pendingManualMatch = nil
+        lookupMessage = nil
     }
 
     /// Explicitly declines the current candidate list without storing anything,
@@ -290,6 +297,7 @@ final class InventoryStore: ObservableObject {
         lookupCandidates = []
         lookupBottleID = nil
         pendingManualMatch = nil
+        lookupMessage = nil
         if isCollectionLookupMode {
             await advanceCollectionLookup()
         }

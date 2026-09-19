@@ -145,7 +145,7 @@ private struct EstimateMatchView: View {
             Group {
                 if store.isLookingUpPrice {
                     ProgressView("Asking the price service…")
-                } else if let error = store.errorMessage, store.lookupCandidates.isEmpty {
+                } else if let error = store.lookupMessage, store.lookupCandidates.isEmpty {
                     // Plain VStack instead of ContentUnavailableView: the
                     // actions button must reliably carry its accessibility
                     // identifier for the fallback UI test.
@@ -158,7 +158,7 @@ private struct EstimateMatchView: View {
                             .multilineTextAlignment(.center)
                             .accessibilityIdentifier("estimateErrorMessage")
                         Button("Enter price manually") {
-                            store.errorMessage = nil
+                            store.lookupMessage = nil
                             dismiss()
                         }
                         .buttonStyle(.borderedProminent)

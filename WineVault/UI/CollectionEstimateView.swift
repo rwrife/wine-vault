@@ -25,7 +25,7 @@ struct CollectionEstimateView: View {
                     ContentUnavailableView {
                         Label("Estimate finished", systemImage: "checkmark.circle")
                     } description: {
-                        Text(store.errorMessage ?? "No bottles left in this estimate run.")
+                        Text(store.lookupMessage ?? "No bottles left in this estimate run.")
                     } actions: {
                         Button("Done") {
                             store.endCollectionEstimate()
@@ -71,7 +71,7 @@ struct CollectionEstimateView: View {
                 }
             } else if store.lookupCandidates.isEmpty {
                 Section {
-                    Text(store.errorMessage ?? "No matches for this bottle.")
+                    Text(store.lookupMessage ?? "No matches for this bottle.")
                         .foregroundStyle(.secondary)
                 }
             } else {
