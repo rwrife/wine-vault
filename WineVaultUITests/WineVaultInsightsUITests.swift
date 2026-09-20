@@ -27,11 +27,12 @@ final class WineVaultInsightsUITests: XCTestCase {
             .firstMatch
     }
 
-    /// First button whose label contains the text. Timeline rows are buttons;
-    /// a `.any` CONTAINS match can resolve to the cell container, whose tap
-    /// does not trigger the row action.
-    private func button(containingLabel text: String) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+    /// First button whose label contains the text, scoped to `container`.
+    /// Timeline rows are Buttons; an app-wide `.any` CONTAINS match can
+    /// resolve to a cell container (whose tap never fires the row action)
+    /// or to an identically-labeled browser row behind the sheet.
+    private func button(containingLabel text: String, in container: XCUIElement) -> XCUIElement {
+        container.buttons.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
 
     /// Scrolls the given list downward until the labeled element is visible
@@ -89,9 +90,9 @@ final class WineVaultInsightsUITests: XCTestCase {
 
     func testTimelineRowSelectionShowsBottleInDetail() {
         launchSeededApp()
-        openTimeline()
+        let list = openTimeline()
 
-        let readyRow = button(containingLabel: "Seed Ready Merlot")
+        let readyRow = button(containingLabel: "Seed Ready Merlot", in: list)
         XCTAssertTrue(readyRow.waitForExistence(timeout: 3))
         readyRow.tap()
 
@@ -152,8 +153,8 @@ final class WineVaultInsightsUITests: XCTestCase {
         XCTAssertTrue(listShown)
         XCTAssertTrue(app.staticTexts["Select a bottle"].exists)
 
-        openTimeline()
-        let readyRow = button(containingLabel: "Seed Ready Merlot")
+        let list = openTimeline()
+        let readyRow = button(containingLabel: "Seed Ready Merlot", in: list)
         XCTAssertTrue(readyRow.waitForExistence(timeout: 3))
         readyRow.tap()
 
