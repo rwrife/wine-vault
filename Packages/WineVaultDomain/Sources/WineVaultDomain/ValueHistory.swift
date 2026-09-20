@@ -6,7 +6,7 @@ import Foundation
 /// A dated collection value observation for the dashboard's value-over-time
 /// chart. Points are change observations derived from the user's own stored
 /// quotes — never a live or implied price.
-public struct ValueHistoryPoint: Equatable, Sendable {
+public struct ValueHistoryPoint: Equatable, Sendable, Identifiable {
     public let date: Date
     public let total: Decimal
     /// Number of bottles counted into `total` on that day.
@@ -17,6 +17,10 @@ public struct ValueHistoryPoint: Equatable, Sendable {
         self.total = total
         self.valuedBottleCount = valuedBottleCount
     }
+
+    /// Stable identity for `Chart`/`ForEach`: history emits at most one
+    /// point per calendar day, so the date alone is unique.
+    public var id: Date { date }
 }
 
 extension ValueHistoryPoint: Comparable {

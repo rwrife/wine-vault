@@ -101,14 +101,17 @@ struct DashboardView: View {
     }
 
     private func valueChart(_ history: [ValueHistoryPoint]) -> some View {
+        // Decimal is not Plottable; the chart plots Double values derived
+        // from the Decimal totals (presentation-only conversion — the data
+        // table below keeps the exact Decimal formatting).
         Chart(history) { point in
             LineMark(
                 x: .value("Date", point.date),
-                y: .value("Estimated total", point.total as NSDecimalNumber)
+                y: .value("Estimated total", (point.total as NSDecimalNumber).doubleValue)
             )
             PointMark(
                 x: .value("Date", point.date),
-                y: .value("Estimated total", point.total as NSDecimalNumber)
+                y: .value("Estimated total", (point.total as NSDecimalNumber).doubleValue)
             )
         }
         .chartYScale(domain: .automatic(includesZero: false))
