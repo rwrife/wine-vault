@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UserNotifications
 import WineVaultData
 import WineVaultDomain
 
@@ -12,22 +13,29 @@ struct InventoryDependencies: Sendable {
     /// this build/launch (e.g. release until a live provider is enabled);
     /// tests and UI tests inject `FixturePriceProvider`.
     let priceProvider: (any PriceProviding)?
+    /// Reminder backend. `nil` means drink-by reminders are unavailable in
+    /// this launch (the UI hides the opt-in); UI tests inject
+    /// `InertReminderScheduler` so the harness never touches real
+    /// notifications. Production injects `UNReminderScheduler`.
+    let reminderScheduling: (any ReminderScheduling)?
 
     init(
         repository: any BottleRepository,
         savePhoto: @escaping @Sendable (Data, UUID) async throws -> Void = { _, _ in },
         photoData: @escaping @Sendable (PhotoReference) async throws -> Data = { _ in Data() },
         deleteBottle: (@Sendable (UUID) async throws -> BottleDeletionResult)? = nil,
-        priceProvider: (any PriceProviding)? = nil
+        priceProvider: (any PriceProviding)? = nil,
+        reminderScheduling: (any ReminderScheduling)? = nil
     ) {
         self.repository = repository
         self.savePhoto = savePhoto
         self.photoData = photoData
-        self.priceProvider = priceProvider
         self.deleteBottle = deleteBottle ?? { id in
             try await repository.deleteBottle(id: id)
             return BottleDeletionResult()
         }
+        self.priceProvider = priceProvider
+        self.reminderScheduling = reminderScheduling
     }
 
     static func appPrivateDefault(priceProvider: (any PriceProviding)? = nil) throws -> InventoryDependencies {
@@ -43,7 +51,8 @@ struct InventoryDependencies: Sendable {
             deleteBottle: { id in
                 try await stack.deleteBottle(id: id)
             },
-            priceProvider: priceProvider
+            priceProvider: priceProvider,
+            reminderScheduling: UNReminderScheduler()
         )
     }
 }
@@ -81,6 +90,39 @@ final class InventoryStore: ObservableObject {
     @Published private(set) var collectionLookupTotal = 0
     private var isCollectionLookupMode = false
 
+    // MARK: - Drink-by reminders state (issue #5)
+
+    /// Persisted user opt-in. The system permission request is only ever
+    /// made when this flag flips on — never at launch.
+    @Published private(set) var remindersOptedIn = false
+    @Published private(set) var remindersAuthorization: UNAuthorizationStatus?
+
+    static let remindersOptInKey = "WineVaultDrinkByRemindersOptIn"
+
+    var isReminderSchedulingAvailable: Bool {
+        dependencies.reminderScheduling != nil
+    }
+
+    var timelineGroups: [(state: DrinkByState, bottles: [Bottle])] {
+        drinkByTimelineGroups(bottles, reference: Date())
+    }
+
+    var dashboardCounts: CollectionCounts? {
+        try? collectionCounts(bottles)
+    }
+
+    var drinkByQuantityCounts: [DrinkByState: Int] {
+        (try? WineVaultDomain.drinkByCounts(bottles, reference: Date())) ?? [:]
+    }
+
+    var valueHistory: [ValueHistoryPoint] {
+        WineVaultDomain.valueHistory(
+            bottles: bottles,
+            quotesByBottle: quotesByBottle,
+            baseCurrency: valuationCurrency
+        )
+    }
+
     var isCollectionLookupActive: Bool {
         isCollectionLookupMode && !collectionLookupQueue.isEmpty
     }
@@ -106,10 +148,12 @@ final class InventoryStore: ObservableObject {
 
     init(repository: any BottleRepository) {
         dependencies = InventoryDependencies(repository: repository)
+        remindersOptedIn = UserDefaults.standard.bool(forKey: Self.remindersOptInKey)
     }
 
     init(dependencies: InventoryDependencies) {
         self.dependencies = dependencies
+        remindersOptedIn = UserDefaults.standard.bool(forKey: Self.remindersOptInKey)
     }
 
     var filteredBottles: [Bottle] {
@@ -130,9 +174,43 @@ final class InventoryStore: ObservableObject {
             bottles = loaded
             quotesByBottle = Dictionary(grouping: quotes, by: \.bottleID)
             errorMessage = nil
+            await syncReminders()
         } catch {
             errorMessage = "Your collection could not be loaded. \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Reminders (issue #5)
+
+    /// Flips the user's drink-by reminders opt-in. The system permission
+    /// request happens only through this user-initiated path — never at
+    /// launch. A denial simply keeps reminders off; the drink-by timeline
+    /// still shows every date in-app.
+    func setRemindersOptedIn(_ optedIn: Bool) async {
+        remindersOptedIn = optedIn
+        UserDefaults.standard.set(optedIn, forKey: Self.remindersOptInKey)
+        await syncReminders()
+    }
+
+    /// Reconciles pending system reminders with the current bottles when
+    /// the user opted in and scheduling is available. Best-effort by
+    /// contract: any backend failure leaves the in-app timeline intact.
+    func syncReminders() async {
+        guard let scheduler = dependencies.reminderScheduling else { return }
+        remindersAuthorization = await scheduler.authorizationStatus
+        guard remindersOptedIn else {
+            await scheduler.cancelAll()
+            return
+        }
+        if remindersAuthorization?.allowsReminders != true {
+            // The user just flipped the opt-in toggle: this is the only
+            // moment the system prompt is surfaced.
+            _ = await scheduler.requestAuthorization()
+            remindersAuthorization = await scheduler.authorizationStatus
+            guard remindersAuthorization?.allowsReminders == true else { return }
+        }
+        let reminders = drinkByReminders(bottles: bottles, reference: Date())
+        await scheduler.schedule(reminders: reminders)
     }
 
     @discardableResult

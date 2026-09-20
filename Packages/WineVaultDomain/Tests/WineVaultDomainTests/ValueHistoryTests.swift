@@ -213,3 +213,109 @@ final class DrinkByTimelineTests: XCTestCase {
         XCTAssertEqual(drinkByStateTitle(.noWindow), "No drink-by date")
     }
 }
+
+final class DrinkByReminderTests: XCTestCase {
+    private var calendar: Calendar { .current }
+
+    private func day(_ year: Int, _ month: Int, _ day: Int, hour: Int = 12) -> Date {
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        return calendar.date(from: components)!
+    }
+
+    private func bottle(name: String, drinkBy: Date?) throws -> Bottle {
+        try Bottle(name: name, quantity: 1, storageLocation: "Rack", drinkBy: drinkBy)
+    }
+
+    func testFutureBottleGetsUpcomingAndDueOnDayAtNineAM() throws {
+        let reference = day(2026, 9, 19)
+        let bottles = [try bottle(name: "Later", drinkBy: day(2026, 10, 20))]
+
+        let reminders = drinkByReminders(bottles: bottles, reference: reference)
+
+        XCTAssertEqual(reminders.count, 2)
+        XCTAssertEqual(reminders.map(\.kind), [.upcoming, .dueOnDay])
+        for reminder in reminders {
+            let hour = calendar.component(.hour, from: reminder.fireDate)
+            XCTAssertEqual(hour, drinkByReminderHour)
+        }
+        XCTAssertEqual(reminders[0].fireDate, day(2026, 10, 13, hour: 9))
+        XCTAssertEqual(reminders[1].fireDate, day(2026, 10, 20, hour: 9))
+    }
+
+    func testPastAndSameDayRemindersAreOmitted() throws {
+        let reference = day(2026, 9, 19, hour: 18)
+        // Due today at 9 AM (already past) and due in the past entirely.
+        let bottles = [
+            try bottle(name: "Today", drinkBy: day(2026, 9, 19, hour: 6)),
+            try bottle(name: "Yesterday", drinkBy: day(2026, 9, 18, hour: 6)),
+        ]
+
+        XCTAssertTrue(drinkByReminders(bottles: bottles, reference: reference).isEmpty)
+    }
+
+    func testBottlesWithoutWindowGetNothing() throws {
+        let bottles = [try bottle(name: "Windowless", drinkBy: nil)]
+        XCTAssertTrue(drinkByReminders(bottles: bottles, reference: day(2026, 9, 19)).isEmpty)
+    }
+
+    func testSortedByFireDateThenName() throws {
+        let reference = day(2026, 9, 19)
+        let bottles = [
+            try bottle(name: "Zeta", drinkBy: day(2026, 11, 1)),
+            try bottle(name: "Alpha", drinkBy: day(2026, 10, 1)),
+            try bottle(name: "Beta", drinkBy: day(2026, 10, 1)),
+        ]
+
+        let reminders = drinkByReminders(bottles: bottles, reference: reference)
+
+        // Fire-date order: Sep 24 (Alpha, Beta upcoming), Oct 1 (Alpha, Beta
+        // due), Oct 25 (Zeta upcoming), Nov 1 (Zeta due).
+        XCTAssertEqual(
+            reminders.map(\.bottleName),
+            ["Alpha", "Beta", "Alpha", "Beta", "Zeta", "Zeta"]
+        )
+        // Strict-comparator sanity: fire dates never decrease.
+        let fireDates = reminders.map(\.fireDate)
+        XCTAssertEqual(fireDates, fireDates.sorted())
+    }
+
+    func testZeroLeadDaysProducesOnlyDueOnDay() throws {
+        let reference = day(2026, 9, 19)
+        let bottles = [try bottle(name: "One Shot", drinkBy: day(2026, 12, 1))]
+
+        let reminders = drinkByReminders(
+            bottles: bottles, reference: reference, leadDays: 0
+        )
+
+        XCTAssertEqual(reminders.count, 1)
+        XCTAssertEqual(reminders.first?.kind, .dueOnDay)
+    }
+
+    func testCappedRemindersKeepsSoonestByBudget() throws {
+        let reference = day(2026, 9, 19)
+        let bottles = try (1...10).map { index in
+            try bottle(name: "B\(index)", drinkBy: day(2026, 10, 1) + Double(index) * 86_400)
+        }
+        let all = drinkByReminders(bottles: bottles, reference: reference)
+        XCTAssertEqual(all.count, 20)
+
+        let capped = cappedReminders(all, budget: 5)
+        XCTAssertEqual(capped.count, 5)
+        XCTAssertEqual(capped.map(\.fireDate), all.prefix(5).map(\.fireDate))
+        // Budget edge cases: zero yields nothing, negative is treated as zero,
+        // an oversized budget keeps everything in order.
+        XCTAssertTrue(cappedReminders(all, budget: 0).isEmpty)
+        XCTAssertTrue(cappedReminders(all, budget: -1).isEmpty)
+        XCTAssertEqual(cappedReminders(all, budget: 100).count, 20)
+    }
+
+    func testTimelineSectionIDsAreStableAndUnique() {
+        let ids = DrinkByState.allCases.map(drinkByTimelineSectionID)
+        XCTAssertEqual(Set(ids).count, DrinkByState.allCases.count)
+        XCTAssertEqual(drinkByTimelineSectionID(.ready), "drinkby.section.ready")
+    }
+}
