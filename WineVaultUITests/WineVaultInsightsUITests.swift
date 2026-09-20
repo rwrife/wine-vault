@@ -96,17 +96,16 @@ final class WineVaultInsightsUITests: XCTestCase {
         XCTAssertTrue(readyRow.waitForExistence(timeout: 3))
         readyRow.tap()
 
-        // Selecting a bottle always dismisses the timeline and returns to the
-        // browser with the shared selection applied. Compact width's pushed
-        // detail rendering and regular width's persistent detail column are
-        // both asserted (the latter) in the regular-width matrix test below;
-        // the selection round-trip through the detail pane is verified by the
-        // detail-visible assertion in the split-layout environment.
+        // Selecting a bottle dismisses the timeline and applies the shared
+        // selection. At compact width the split view pushes the bottle
+        // detail over the browser, so the detail's own controls are the
+        // proof of selection; the regular-width persistent-column variant
+        // is asserted in the matrix test below.
         let sheetGone = app.buttons["timelineDoneButton"]
             .waitForExistence(timeout: 5) == false
         XCTAssertTrue(sheetGone, "timeline sheet must dismiss on selection")
-        let browserVisible = app.collectionViews["bottleList"].waitForExistence(timeout: 5)
-        XCTAssertTrue(browserVisible)
+        let detailShown = app.buttons["editBottleButton"].waitForExistence(timeout: 5)
+        XCTAssertTrue(detailShown, "selected bottle detail must be presented")
     }
 
     func testDashboardSummarizesAndExposesChartDataTable() {
