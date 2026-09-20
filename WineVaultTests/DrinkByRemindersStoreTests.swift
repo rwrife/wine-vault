@@ -212,10 +212,10 @@ final class DrinkByRemindersStoreTests: XCTestCase {
         XCTAssertTrue(store.valueHistory.isEmpty, "no quotes means no fabricated points")
 
         // Offline manual entry is a confirmed quote path through the store.
-        let saved = await store.saveManualPrice(
+        let quoteSaved = await store.saveManualPrice(
             amount: 30, currency: "USD", for: bottle, matchLabel: "Test entry"
         )
-        XCTAssertTrue(saved)
+        XCTAssertTrue(quoteSaved)
         // saveManualPrice reloads internally, so the point is already visible.
         await store.load()
         XCTAssertEqual(store.valueHistory.count, 1)

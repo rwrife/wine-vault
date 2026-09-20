@@ -97,7 +97,7 @@ final class InventoryStore: ObservableObject {
     @Published private(set) var remindersOptedIn = false
     @Published private(set) var remindersAuthorization: UNAuthorizationStatus?
 
-    static let remindersOptInKey = "WineVaultDrinkByRemindersOptIn"
+    nonisolated static let remindersOptInKey = "WineVaultDrinkByRemindersOptIn"
 
     var isReminderSchedulingAvailable: Bool {
         dependencies.reminderScheduling != nil
