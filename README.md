@@ -66,6 +66,22 @@ when dual-screen SDK support matures, the secondary column relocates to the
 companion display with continuity across fold/unfold, without changing the
 data layer or navigation model.
 
+**Adaptive behavior matrix (shipped):**
+
+| Screen | Compact width (iPhone portrait) | Regular width (tablet class / Duo-unfold migration target) |
+| --- | --- | --- |
+| Collection browser | `NavigationSplitView` collapses to stacked push navigation | Two columns: browser list + **persistent detail pane** (photo, notes, quote history, actions) that survives list scrolling and selection changes |
+| Drink-by timeline | Opens modally; tapping a row dismisses it and pushes the bottle detail | Opens modally; tapping a row dismisses it and fills the persistent detail column, browser stays visible |
+| Dashboard | Opens modally, full-screen summary | Opens modally; charts carry a data-table fallback readable by VoiceOver |
+| Detail pane content | Same view content, stacked | Same view content, permanently visible beside the list |
+
+The persistent detail column *is* the companion-display surface in
+embryo: it renders bottle photo, notes, quote history, and drink-by actions
+independently of the list, keyed only by the current selection — so
+relocating it to the Duo companion screen later is a layout assignment, not
+a data-model or navigation rewrite. No fold/dual-screen SDK APIs are used
+anywhere in the shipped code.
+
 ## MVP feature list
 
 - Bottle records: name, producer, vintage, region, grape, quantity,
@@ -94,7 +110,10 @@ data layer or navigation model.
   app's private container; photos in app-private storage. Nothing leaves the
   device unless the user exports or explicitly requests a price lookup.
 - **Permissions:** Camera (label photos) and Notifications (drink-by
-  reminders) only — both opt-in, both gracefully degradable.
+  reminders) only — both opt-in, both gracefully degradable. The
+  notification permission prompt is raised only when the user flips the
+  drink-by reminders toggle in the timeline; denying it keeps the full
+  in-app timeline working and schedules nothing.
 - **Network:** only price-lookup requests, initiated per-request by the
   user. Lookup requests carry only the query text the user chose to send;
   no device identifiers, no collection metadata in bulk.
@@ -116,8 +135,13 @@ The XcodeGen-driven app target retains its iOS 26 SDK requirement. The app now
 provides the local add/browse/search/filter/edit/delete workflow over the GRDB
 repository, with optional camera-only label capture into the existing private
 photo store. Compact width uses stacked navigation and regular width keeps the
-browser and detail visible. No networking, accounts, cloud, telemetry, Photo
-Library permission, or secret access is used by this workflow.
+browser and detail visible. Drink-by reminders (opt-in, permission requested
+only on the toggle), the drink-by timeline, and the collection dashboard
+(region/grape counts, drink-by rollup, value-over-time chart with a data-table
+fallback) shipped on top of that layout; the value chart derives only from
+quotes the user confirmed or entered. No networking, accounts, cloud,
+telemetry, Photo Library permission, or secret access is used by these
+workflows.
 Deletion is permanent after confirmation and also removes that bottle's
 cascading valuation history; undo is intentionally not offered because it
 could not faithfully restore those quotes. App-stack deletion also removes
@@ -132,7 +156,8 @@ and explicit orphan garbage collection remains available for recovery.
 - [x] M2: add/browse/edit bottles (source and tests implemented; hosted iOS
   evidence remains required as described below)
 - [ ] M3: opt-in price lookup + collection valuation
-- [ ] M4: dashboards, drink-by reminders, adaptive tablet layout
+- [ ] M4: dashboards, drink-by reminders, adaptive tablet layout (source and
+  tests implemented in PR; hosted iOS 26 CI evidence gates acceptance)
 - [ ] M5: export/backup/restore, TestFlight release
 
 ## Development quickstart

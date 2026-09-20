@@ -10,6 +10,8 @@ struct CollectionView: View {
     @State private var editingBottle: Bottle?
     @State private var pendingDeletion: Bottle?
     @State private var showingCollectionEstimate = false
+    @State private var showingTimeline = false
+    @State private var showingDashboard = false
 
     var body: some View {
         NavigationSplitView {
@@ -28,6 +30,31 @@ struct CollectionView: View {
                     systemImage: "wineglass",
                     description: Text("Choose a bottle to see its cellar details.")
                 )
+            }
+        }
+        .sheet(isPresented: $showingTimeline) {
+            NavigationStack {
+                DrinkByTimelineView(store: store) { id in
+                    selection = id
+                    showingTimeline = false
+                }
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingTimeline = false }
+                            .accessibilityIdentifier("timelineDoneButton")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingDashboard) {
+            NavigationStack {
+                DashboardView(store: store)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showingDashboard = false }
+                                .accessibilityIdentifier("dashboardDoneButton")
+                        }
+                    }
             }
         }
         .sheet(isPresented: $showingAdd) {
@@ -110,6 +137,14 @@ struct CollectionView: View {
         .searchable(text: $store.criteria.searchText, prompt: "Name, producer, or region")
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                Button("Dashboard", systemImage: "chart.bar.xaxis") {
+                    showingDashboard = true
+                }
+                .accessibilityIdentifier("dashboardButton")
+                Button("Drink-by timeline", systemImage: "calendar") {
+                    showingTimeline = true
+                }
+                .accessibilityIdentifier("timelineButton")
                 Button("Filter", systemImage: filterSystemImage) {
                     showingFilters = true
                 }

@@ -199,6 +199,7 @@ jobs:
             -destination-timeout 120 \
             -resultBundlePath artifacts/regular-tests.xcresult \
             -only-testing:WineVaultUITests/WineVaultWorkflowUITests/testRegularWidthShowsBrowserAndDetailColumns \
+            -only-testing:WineVaultUITests/WineVaultInsightsUITests/testRegularWidthTimelineSelectionKeepsPersistentDetail \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee artifacts/regular-tests.log | xcbeautify
 
