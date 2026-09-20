@@ -27,6 +27,13 @@ final class WineVaultInsightsUITests: XCTestCase {
             .firstMatch
     }
 
+    /// First button whose label contains the text. Timeline rows are buttons;
+    /// a `.any` CONTAINS match can resolve to the cell container, whose tap
+    /// does not trigger the row action.
+    private func button(containingLabel text: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+    }
+
     /// Scrolls the given list downward until the labeled element is visible
     /// (section headers below the fold need explicit scrolling).
     @discardableResult
@@ -84,7 +91,7 @@ final class WineVaultInsightsUITests: XCTestCase {
         launchSeededApp()
         openTimeline()
 
-        let readyRow = element(containingLabel: "Seed Ready Merlot")
+        let readyRow = button(containingLabel: "Seed Ready Merlot")
         XCTAssertTrue(readyRow.waitForExistence(timeout: 3))
         readyRow.tap()
 
@@ -146,7 +153,7 @@ final class WineVaultInsightsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Select a bottle"].exists)
 
         openTimeline()
-        let readyRow = element(containingLabel: "Seed Ready Merlot")
+        let readyRow = button(containingLabel: "Seed Ready Merlot")
         XCTAssertTrue(readyRow.waitForExistence(timeout: 3))
         readyRow.tap()
 
