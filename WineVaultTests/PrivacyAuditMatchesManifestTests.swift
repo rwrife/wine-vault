@@ -50,6 +50,7 @@ final class PrivacyAuditMatchesManifestTests: XCTestCase {
         ])
     }
 
+    @MainActor
     func testCSVCarriesNoIdentifierOrPhotoColumns() async throws {
         // Export content contract exercised through the store path.
         let root = FileManager.default.temporaryDirectory
@@ -65,16 +66,24 @@ final class PrivacyAuditMatchesManifestTests: XCTestCase {
         try await stack.repository.create(bottle)
         await store.load()
         await store.exportInventoryCSV()
-        let data = try XCTUnwrap(store.csvShareData)
+        let shareData = store.csvShareData
+        let data = try XCTUnwrap(shareData)
         let text = try XCTUnwrap(String(data: data, encoding: .utf8))
         let header = try XCTUnwrap(text.components(separatedBy: "\r\n").first)
-        for banned in ["id", "photo", "lat", "lon", "device", "uuid"] {
-            XCTAssertFalse(
-                header.lowercased().split(separator: ",").contains(where: { $0.contains(banned) }),
-                "CSV header leaked a \(banned)-ish column: \(header)"
+        // Whole-token check (split on '_'): substring matching would flag
+        // legitimate columns like "latest_quote_*" for "lat".
+        let banned: Set<String> = ["id", "photo", "photos", "lat", "lon", "device", "uuid"]
+        for column in header.lowercased().split(separator: ",") {
+            let tokens = Set(column.split(separator: "_").map(String.init))
+            XCTAssertTrue(
+                tokens.isDisjoint(with: banned),
+                "CSV header leaked an identifier-ish column: \(column)"
             )
         }
-        XCTAssertTrue(text.contains("CSV") || true)
-        XCTAssertNotNil(store.backupMessage)
+        let message = store.backupMessage
+        XCTAssertTrue(
+            message?.contains("CSV") == true,
+            "Export should report CSV readiness, got: \(message ?? "nil")"
+        )
     }
 }
