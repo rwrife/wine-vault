@@ -68,11 +68,3 @@ struct InertBackupService: BackupServicing {
         )
     }
 }
-
-/// Activity items for the system share sheet.
-struct ShareItems: Sendable {
-    let csv: Data?
-    let zip: Data?
-    let suggestedZipName: String
-    let suggestedCSVName: String
-}

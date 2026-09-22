@@ -30,10 +30,9 @@ struct SettingsView: View {
                     Task {
                         await store.exportInventoryCSV()
                         if let csv = store.csvShareData {
-                            sharePayload = SharePayload(
+                            sharePayload = try? SharePayload(
                                 data: csv,
-                                fileName: "wine-vault-inventory.csv",
-                                contentType: .commaSeparatedText
+                                fileName: "wine-vault-inventory.csv"
                             )
                         }
                     }
@@ -53,10 +52,9 @@ struct SettingsView: View {
                     Task {
                         await store.createBackup()
                         if let zip = store.zipShareData {
-                            sharePayload = SharePayload(
+                            sharePayload = try? SharePayload(
                                 data: zip,
-                                fileName: store.suggestedBackupName,
-                                contentType: .zip
+                                fileName: store.suggestedBackupName
                             )
                         }
                     }
@@ -154,7 +152,7 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .sheet(item: $sharePayload) { payload in
-            ShareSheetContainer(items: [payload.item])
+            ShareSheetContainer(items: [payload.url])
         }
         .fileImporter(
             isPresented: $showingRestorePicker,
@@ -275,36 +273,29 @@ private struct RemindersPermissionView: View {
     }
 }
 
-/// One shared-sheet payload with a file name + type so receivers see a
-/// proper file rather than anonymous data.
-struct SharePayload: Identifiable, Sendable {
-    let data: Data
+/// One share-sheet payload: a real file URL in the app's temporary
+/// directory (with a user-facing name), which `UIActivityViewController`
+/// shares natively.
+struct SharePayload: Identifiable {
+    let url: URL
+    /// Name the user should see for this export.
     let fileName: String
-    let contentType: UTType
-    var id: String { fileName }
+    var id: URL { url }
 
-    var item: ShareItem { ShareItem(self) }
-}
-
-/// File-wrapped activity item so the share sheet writes a real file.
-struct ShareItem: Transferable {
-    private let payload: SharePayload
-
-    init(_ payload: SharePayload) {
-        self.payload = payload
+    /// Writes the payload to a unique temporary file so the share sheet
+    /// transfers a named file (`UIActivityViewController` derives the
+    /// transfer type from the file's extension).
+    init(
+        data: Data,
+        fileName: String,
+        stagingDirectory: URL = FileManager.default.temporaryDirectory
+    ) throws {
+        let url = stagingDirectory
+            .appendingPathComponent(".share-\(UUID().uuidString)-\(fileName)")
+        try data.write(to: url, options: .atomic)
+        self.url = url
+        self.fileName = fileName
     }
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(contentType: .data) { item in
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent(item.fileName)
-            try item.data.write(to: url, options: .atomic)
-            return SentTransferredFile(url)
-        }
-    }
-
-    var data: Data { payload.data }
-    var fileName: String { payload.fileName }
 }
 
 /// Minimal UIActivityViewController wrapper for the classic share sheet.
