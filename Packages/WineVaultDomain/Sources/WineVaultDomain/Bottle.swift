@@ -12,6 +12,11 @@ public enum DomainValidationError: Error, Equatable, Sendable {
 public struct PhotoReference: Codable, Hashable, Sendable {
     public let path: String
 
+    /// File name component of the reference (the last path element).
+    public var fileName: String {
+        String(path.split(separator: "/").last ?? Substring(path))
+    }
+
     public init(_ path: String) throws {
         let components = path.split(separator: "/", omittingEmptySubsequences: false)
         guard components.count == 2,

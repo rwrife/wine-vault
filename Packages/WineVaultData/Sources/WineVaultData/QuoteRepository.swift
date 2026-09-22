@@ -101,7 +101,7 @@ extension SQLiteBottleRepository {
     }
 }
 
-private func decodeQuote(_ row: Row) throws -> ValuationQuote {
+func decodeQuote(_ row: Row) throws -> ValuationQuote {
     guard let id = UUID(uuidString: row["id"]),
           let bottleID = UUID(uuidString: row["bottleID"]),
           let amount = Decimal(string: row["amount"], locale: Locale(identifier: "en_US_POSIX")) else {

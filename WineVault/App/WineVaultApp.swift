@@ -20,7 +20,9 @@ struct WineVaultApp: App {
                 photoData: { reference in try await stack.photos.data(for: reference) },
                 deleteBottle: { id in try await stack.deleteBottle(id: id) },
                 priceProvider: Self.uiTestPriceProvider(),
-                reminderScheduling: InertReminderScheduler()
+                reminderScheduling: InertReminderScheduler(),
+                backup: InertBackupService(),
+                appVersion: "uitest"
             )
         }
         return try InventoryDependencies.appPrivateDefault()

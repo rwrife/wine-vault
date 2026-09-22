@@ -246,7 +246,7 @@ public actor SQLiteBottleRepository: BottleRepository {
     }
 }
 
-private func insert(_ bottle: Bottle, in database: Database) throws {
+func insert(_ bottle: Bottle, in database: Database) throws {
     try database.execute(
         sql: """
             INSERT INTO bottles
@@ -263,7 +263,7 @@ private func insert(_ bottle: Bottle, in database: Database) throws {
     )
 }
 
-private func decodeBottle(_ row: Row) throws -> Bottle {
+func decodeBottle(_ row: Row) throws -> Bottle {
     guard let id = UUID(uuidString: row["id"]) else {
         throw RepositoryError.invalidStoredValue
     }
@@ -283,7 +283,7 @@ private func decodeBottle(_ row: Row) throws -> Bottle {
     )
 }
 
-private func encode<T: Encodable>(_ value: T) throws -> String {
+func encode<T: Encodable>(_ value: T) throws -> String {
     let data = try JSONEncoder().encode(value)
     guard let string = String(data: data, encoding: .utf8) else {
         throw RepositoryError.invalidStoredValue
@@ -291,7 +291,7 @@ private func encode<T: Encodable>(_ value: T) throws -> String {
     return string
 }
 
-private func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
+func decode<T: Decodable>(_ type: T.Type, from string: String) throws -> T {
     guard let data = string.data(using: .utf8) else {
         throw RepositoryError.invalidStoredValue
     }

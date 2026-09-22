@@ -128,6 +128,44 @@ public actor PhotoStore {
         _ = try safeURL(for: reference, mayNotExist: false)
     }
 
+    /// Absolute URL of the live photos directory inside this store's root.
+    func photosDirectoryURL() throws -> URL {
+        try validateDirectories()
+        return photosDirectory
+    }
+
+    static func isPlainFile(_ url: URL) throws -> Bool {
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        return values.isRegularFile == true && values.isSymbolicLink != true
+    }
+
+    /// Packs every file physically present under `photos/` into ZIP
+    /// entries (name `photos/<file>`); returns them plus the references
+    /// covered. Caller must hold exclusive access.
+    func packedPhotos(now: Date) throws -> (entries: [ZipEntry], covered: Set<PhotoReference>) {
+        try validateDirectories()
+        let urls = try FileManager.default.contentsOfDirectory(
+            at: photosDirectory,
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+            options: [.skipsHiddenFiles]
+        )
+        var entries: [ZipEntry] = []
+        var covered: Set<PhotoReference> = []
+        for url in urls {
+            let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true || values.isSymbolicLink == true else { continue }
+            guard url.deletingLastPathComponent().standardizedFileURL.path == photosDirectory.path,
+                  let reference = try? PhotoReference("photos/\(url.lastPathComponent)") else {
+                throw PhotoStoreError.unsafeReference
+            }
+            entries.append(
+                ZipEntry(name: reference.path, data: try Data(contentsOf: url), modificationDate: now)
+            )
+            covered.insert(reference)
+        }
+        return (entries, covered)
+    }
+
     func deleteWithoutCoordination(_ reference: PhotoReference) throws {
         let url = try safeURL(for: reference, mayNotExist: false)
         try validateDirectories()

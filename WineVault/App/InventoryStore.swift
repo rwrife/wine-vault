@@ -18,6 +18,13 @@ struct InventoryDependencies: Sendable {
     /// `InertReminderScheduler` so the harness never touches real
     /// notifications. Production injects `UNReminderScheduler`.
     let reminderScheduling: (any ReminderScheduling)?
+    /// Backup backend. `nil` means export/backup is unavailable in this
+    /// launch; UI tests inject an in-memory `InertBackupService` so the
+    /// harness never writes real archives.
+    let backup: (any BackupServicing)?
+
+    /// App version string embedded in backup manifests.
+    let appVersion: String
 
     init(
         repository: any BottleRepository,
@@ -25,7 +32,9 @@ struct InventoryDependencies: Sendable {
         photoData: @escaping @Sendable (PhotoReference) async throws -> Data = { _ in Data() },
         deleteBottle: (@Sendable (UUID) async throws -> BottleDeletionResult)? = nil,
         priceProvider: (any PriceProviding)? = nil,
-        reminderScheduling: (any ReminderScheduling)? = nil
+        reminderScheduling: (any ReminderScheduling)? = nil,
+        backup: (any BackupServicing)? = nil,
+        appVersion: String = "0.1.0"
     ) {
         self.repository = repository
         self.savePhoto = savePhoto
@@ -36,6 +45,8 @@ struct InventoryDependencies: Sendable {
         }
         self.priceProvider = priceProvider
         self.reminderScheduling = reminderScheduling
+        self.backup = backup
+        self.appVersion = appVersion
     }
 
     static func appPrivateDefault(priceProvider: (any PriceProviding)? = nil) throws -> InventoryDependencies {
@@ -52,8 +63,19 @@ struct InventoryDependencies: Sendable {
                 try await stack.deleteBottle(id: id)
             },
             priceProvider: priceProvider,
-            reminderScheduling: UNReminderScheduler()
+            reminderScheduling: UNReminderScheduler(),
+            backup: StackBackupService(stack: stack),
+            appVersion: Self.displayAppVersion()
         )
+    }
+
+    /// CFBundleShortVersionString (CFBundleVersion) when available, so the
+    /// manifest records the real shipping version.
+    static func displayAppVersion() -> String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        let build = info?["CFBundleVersion"] as? String ?? "0"
+        return "\(short) (\(build))"
     }
 }
 
@@ -142,6 +164,69 @@ final class InventoryStore: ObservableObject {
 
     func latestQuote(for bottleID: UUID) -> ValuationQuote? {
         WineVaultDomain.latestQuote(in: quotesByBottle[bottleID] ?? [])
+    }
+
+    // MARK: - Export / backup / restore (issue #6)
+
+    @Published private(set) var isExporting = false
+    /// Success/failure guidance for export and restore, shown in settings.
+    @Published var backupMessage: String?
+    /// Last CSV export payload offered to the share sheet.
+    @Published private(set) var csvShareData: Data?
+    /// Last ZIP backup offered to the share sheet.
+    @Published private(set) var zipShareData: Data?
+    @Published private(set) var suggestedBackupName = "wine-vault-backup.zip"
+
+    var isBackupAvailable: Bool {
+        dependencies.backup != nil
+    }
+
+    func exportInventoryCSV() async {
+        guard !isExporting else { return }
+        isExporting = true
+        defer { isExporting = false }
+        let csv = inventoryCSV(bottles: bottles, quotesByBottle: quotesByBottle)
+        guard let data = csv.data(using: .utf8) else {
+            backupMessage = "The inventory could not be encoded as CSV."
+            return
+        }
+        csvShareData = data
+        backupMessage = "CSV ready: \(bottles.count) bottle row(s) with quote provenance."
+    }
+
+    func createBackup() async {
+        guard let backup = dependencies.backup, !isExporting else { return }
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            let bundle = try await backup.createBackup(appVersion: dependencies.appVersion)
+            zipShareData = bundle.zipData
+            suggestedBackupName = bundle.suggestedFileName
+            backupMessage = "Backup ready: \(bundle.suggestedFileName)"
+        } catch {
+            backupMessage = "The backup could not be created. \(error.localizedDescription)"
+        }
+    }
+
+    /// Applies a picked ZIP archive. Failures leave existing data intact
+    /// (the data layer validates the whole archive before touching it).
+    func restore(zipData: Data, strategy: BackupRestoreStrategy) async {
+        guard let backup = dependencies.backup, !isExporting else { return }
+        isExporting = true
+        defer { isExporting = false }
+        do {
+            let summary = try await backup.restoreBackup(from: zipData, strategy: strategy)
+            await load()
+            backupMessage = """
+                Restored \(summary.bottlesInserted) new and \
+                \(summary.bottlesReplaced) replaced bottle(s), \
+                \(summary.photosRestored) photo(s).
+                """
+        } catch let error as BackupError {
+            backupMessage = BackupErrorText.describe(error)
+        } catch {
+            backupMessage = "The restore failed. Your current collection is untouched."
+        }
     }
 
     private let dependencies: InventoryDependencies
