@@ -21,18 +21,37 @@ final class WineVaultBackupUITests: XCTestCase {
         app.launch()
     }
 
+    /// SwiftUI `List` renders lazily: at compact width the privacy
+    /// section sits below the fold. Swipe up until the identifier
+    /// exists (bounded), then assert.
+    @MainActor
+    private func scrollToIdentifier(_ identifier: String) -> Bool {
+        let element = app.staticTexts.matching(
+            NSPredicate(format: "identifier == %@", identifier)
+        ).firstMatch
+        if element.waitForExistence(timeout: 5) { return true }
+        let table = app.tables.firstMatch
+        for _ in 0..<6 {
+            guard table.exists else { return false }
+            table.swipeUp()
+            if element.waitForExistence(timeout: 3) { return true }
+        }
+        return element.exists
+    }
+
     @MainActor
     func testSettingsExposesPrivacyAuditAndBackupControls() {
         launchSeededApp()
         app.buttons["settingsButton"].tap()
 
-        XCTAssertTrue(
-            app.staticTexts["privacyNeverCollected"].waitForExistence(timeout: 5),
-            "The privacy audit statement must be visible in settings."
-        )
         XCTAssertTrue(app.buttons["exportCSVButton"].exists)
         XCTAssertTrue(app.buttons["createBackupButton"].exists)
         XCTAssertTrue(app.buttons["restoreBackupButton"].exists)
+
+        XCTAssertTrue(
+            scrollToIdentifier("privacyNeverCollected"),
+            "The privacy audit statement must be reachable in settings."
+        )
 
         app.buttons["settingsDoneButton"].tap()
     }
