@@ -113,12 +113,30 @@ anywhere in the shipped code.
   reminders) only — both opt-in, both gracefully degradable. The
   notification permission prompt is raised only when the user flips the
   drink-by reminders toggle in the timeline; denying it keeps the full
-  in-app timeline working and schedules nothing.
+  in-app timeline working and schedules nothing. The in-app **Settings →
+  Privacy & permissions** page documents each permission, its degradation
+  behavior, and links to the system permission screen; its claims are
+  locked to `PrivacyInfo.xcprivacy` by a unit test.
 - **Network:** only price-lookup requests, initiated per-request by the
   user. Lookup requests carry only the query text the user chose to send;
   no device identifiers, no collection metadata in bulk.
-- **Export/backup:** user-owned CSV/ZIP files via the system share sheet;
-  no vendor-held copies.
+- **Export/backup (shipped):**
+  - **CSV export** — one row per bottle including its latest confirmed
+    quote's amount, currency, quote date, and source. Columns carry only
+    fields the user entered or confirmed: no identifiers, no photos, no
+    location data. Shared via the system share sheet.
+  - **ZIP backup** — versioned manifest (backup format version, database
+    schema version, app version, timestamp, SHA-256 checksums) + a SQLite
+    online-backup snapshot + every label photo. Store-method ZIP with
+    CRC-32s, opens unmodified in macOS Finder, Archive Utility, and
+    Python `zipfile`.
+  - **Restore** — pick a ZIP in-app; the archive is fully validated first
+    (manifest, checksums, exact entry set, schema version, migratability,
+    zip-slip path checks), then applied with an explicit **Merge**
+    (insert/replace same identifiers, keep local-only records) or
+    **Replace** (wipe, then apply) choice. Any failure — corruption,
+    foreign file, future schema — aborts before touching live data and
+    the existing collection is left intact.
 
 ## Bundle ID / App Store Connect
 

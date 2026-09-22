@@ -12,6 +12,7 @@ struct CollectionView: View {
     @State private var showingCollectionEstimate = false
     @State private var showingTimeline = false
     @State private var showingDashboard = false
+    @State private var showingSettings = false
 
     var body: some View {
         NavigationSplitView {
@@ -68,6 +69,17 @@ struct CollectionView: View {
         }
         .sheet(isPresented: $showingCollectionEstimate) {
             CollectionEstimateView(store: store)
+        }
+        .sheet(isPresented: $showingSettings) {
+            NavigationStack {
+                SettingsView(store: store)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showingSettings = false }
+                                .accessibilityIdentifier("settingsDoneButton")
+                        }
+                    }
+            }
         }
         .alert("Delete \(pendingDeletion?.name ?? "bottle")?", isPresented: deletionPresented) {
             Button("Cancel", role: .cancel) { pendingDeletion = nil }
@@ -136,6 +148,12 @@ struct CollectionView: View {
         .navigationTitle("Wine Vault")
         .searchable(text: $store.criteria.searchText, prompt: "Name, producer, or region")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Settings", systemImage: "gearshape") {
+                    showingSettings = true
+                }
+                .accessibilityIdentifier("settingsButton")
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button("Dashboard", systemImage: "chart.bar.xaxis") {
                     showingDashboard = true
