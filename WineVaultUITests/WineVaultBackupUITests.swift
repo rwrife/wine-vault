@@ -22,26 +22,17 @@ final class WineVaultBackupUITests: XCTestCase {
     }
 
     /// SwiftUI `List` renders lazily: at compact width the privacy
-    /// section sits below the fold. The container exposes as a
-    /// collection list/table in the a11y tree, so swipe whichever one
-    /// exists (bounded) until the identifier materialises.
+    /// section sits below the fold. Swipe the screen (bounded) until the
+    /// identifier materialises — coordinate-based so it doesn't depend
+    /// on which container type the List surfaces as.
     @MainActor
     private func scrollToIdentifier(_ identifier: String) -> Bool {
         let element = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier == %@", identifier)
         ).firstMatch
         if element.waitForExistence(timeout: 5) { return true }
-        let container: XCUIElement
-        if app.collectionLists.firstMatch.exists {
-            container = app.collectionLists.firstMatch
-        } else if app.tables.firstMatch.exists {
-            container = app.tables.firstMatch
-        } else {
-            container = app.collectionViews.firstMatch
-        }
         for _ in 0..<6 {
-            guard container.exists else { return false }
-            container.swipeUp()
+            app.swipeUp()
             if element.waitForExistence(timeout: 3) { return true }
         }
         return element.exists
