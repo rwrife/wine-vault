@@ -131,6 +131,7 @@ struct SettingsView: View {
                     Text(Self.privacyStatement)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("privacyNeverCollected")
                     Text(
                         "This matches the app's privacy manifest: no tracking, "
                             + "no tracking domains, and no collected data types."
@@ -138,7 +139,6 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 }
-                .accessibilityIdentifier("privacyNeverCollected")
 
                 if store.isReminderSchedulingAvailable {
                     NavigationLink {
