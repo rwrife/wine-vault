@@ -81,7 +81,8 @@ final class ReleaseMetadataTests: XCTestCase {
         let bundle = Bundle(for: ReleaseMetadataTests.self)
         let url = bundle.url(forResource: "PrivacyInfo", withExtension: "xcprivacy")
             ?? Bundle.main.url(forResource: "PrivacyInfo", withExtension: "xcprivacy")
-        let data = try XCTUnwrap(url, "PrivacyInfo.xcprivacy is not bundled")
+        let plistURL = try XCTUnwrap(url, "PrivacyInfo.xcprivacy is not bundled")
+        let data = try Data(contentsOf: plistURL)
         let manifest = try XCTUnwrap(
             PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         )
