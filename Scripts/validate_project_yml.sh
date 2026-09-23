@@ -4,9 +4,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-python3 -c "import yaml" 2>/dev/null || pip3 install --quiet pyyaml
+# pyyaml comes from the system env when available; otherwise use a throwaway
+# venv (macOS Homebrew Python is externally-managed and rejects pip installs).
+if python3 -c "import yaml" 2>/dev/null; then
+    PYBIN=python3
+else
+    VENV="${TMPDIR:-/tmp}/winevault-validate-venv"
+    python3 -m venv "$VENV"
+    "$VENV/bin/pip" install --quiet pyyaml
+    PYBIN="$VENV/bin/python3"
+fi
 
-python3 - <<'PY'
+"$PYBIN" - <<'PY'
 import sys
 try:
     import yaml
