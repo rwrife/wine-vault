@@ -194,9 +194,13 @@ jobs:
           WV_BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
-          pip3 install --quiet 'pyjwt[crypto]'
+          # macOS Homebrew Python is externally managed (PEP 668): install
+          # into a throwaway venv instead of the system env.
+          VENV="$RUNNER_TEMP/asc-venv"
+          python3 -m venv "$VENV"
+          "$VENV/bin/pip" install --quiet 'pyjwt[crypto]'
           WV_KEY_ID="$ASC_KEY_ID_VALUE" WV_ISSUER_ID="$ASC_ISSUER_ID_VALUE" \
-          WV_BUNDLE_ID="$BUNDLE_ID" python3 - <<'PY'
+          WV_BUNDLE_ID="$BUNDLE_ID" "$VENV/bin/python3" - <<'PY'
           import json, os, sys, time, urllib.request
           import jwt
 
