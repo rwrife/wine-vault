@@ -23,6 +23,9 @@ jobs:
       - name: Validate project.yml
         run: bash Scripts/validate_project_yml.sh
 
+      - name: Check release metadata consistency (plist vs ReleaseInfo)
+        run: python3 Scripts/check_release_metadata.py
+
       - name: Build Swift 6.1 image with SQLite development headers
         run: docker build -f .github/docker/SwiftSQLite.Dockerfile -t wine-vault-swift:6.1-sqlite .
 

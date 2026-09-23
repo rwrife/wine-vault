@@ -27,5 +27,19 @@ assert ui_tests["type"] == "bundle.ui-testing"
 assert {"WineVaultTests", "WineVaultUITests"}.issubset(
     set(doc["schemes"]["WineVault"]["test"]["targets"])
 )
-print("project.yml OK: iOS 26 app + unit/UI test targets + camera rationale")
+base = doc["schemes"]["WineVault"]
+assert base["archive"]["config"] == "Release", "archive scheme must build Release for TestFlight"
+app_settings = app["settings"]["base"]
+assert app_settings.get("MARKETING_VERSION"), "MARKETING_VERSION required for release"
+# Keep the release metadata draft in sync (WineVault/App/ReleaseInfo.swift).
+import pathlib, re
+release_info = pathlib.Path("WineVault/App/ReleaseInfo.swift")
+if release_info.exists():
+    version = re.search(
+        r'static let version = "([^"]+)"', release_info.read_text()
+    )
+    assert version and version.group(1) == app_settings["MARKETING_VERSION"], (
+        "ReleaseInfo.version must match MARKETING_VERSION"
+    )
+print("project.yml OK: iOS 26 app + unit/UI test targets + camera rationale + release scheme")
 PY

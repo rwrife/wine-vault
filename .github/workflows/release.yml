@@ -1,0 +1,293 @@
+name: Release
+
+# Issue #7: TestFlight release pipeline via App Store Connect API secrets.
+# Secrets are referenced BY NAME only (ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8,
+# ASC_TEAM_ID) and are never echoed, printed, or committed anywhere.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "Upload the exported build to TestFlight"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SCHEME: WineVault
+  BUNDLE_ID: com.infinityball.winevault
+
+jobs:
+  testflight:
+    name: Archive + TestFlight upload (iOS 26)
+    runs-on: macos-15-large
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select newest Xcode 26 and verify iOS 26 SDK
+        timeout-minutes: 2
+        run: |
+          XCODE=$(python3 - <<'PY'
+          import glob, re
+          candidates = glob.glob("/Applications/Xcode_26*.app")
+          def version(path):
+              return tuple(int(value) for value in re.findall(r"\d+", path))
+          print(max(candidates, key=version) if candidates else "")
+          PY
+          )
+          if [ -n "$XCODE" ]; then
+            sudo xcode-select -s "$XCODE"
+          fi
+          xcodebuild -version
+          if ! xcodebuild -showsdks | grep -Eqi 'iphoneos(2[6-9]|[3-9][0-9])'; then
+            echo "ERROR: iOS 26+ SDK not present on runner — refusing to release on an older SDK"
+            exit 1
+          fi
+
+      - name: Validate project.yml + release metadata
+        timeout-minutes: 3
+        run: |
+          bash Scripts/validate_project_yml.sh
+          python3 Scripts/check_release_metadata.py
+
+      - name: Generate Xcode project from project.yml
+        timeout-minutes: 10
+        run: |
+          brew install xcodegen xcbeautify
+          xcodegen generate
+
+      - name: Prepare ephemeral signing keychain
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesigning: -s -k "" build.keychain
+          # Count only — identity names are never printed to logs.
+          security find-identity -v -p codesigning build.keychain \
+            | awk '/valid identities found/{print "Available code-signing identities: " $1}'
+
+      - name: Write App Store Connect API key (file only; contents never logged)
+        timeout-minutes: 1
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_TEAM_ID: ${{ secrets.ASC_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/asc"
+          # Accept both real newlines and literal "\n" escapes without echoing.
+          printf '%s' "$ASC_KEY_P8" | sed 's/\\n/\n/g' > "$RUNNER_TEMP/asc/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/asc/AuthKey.p8"
+          {
+            echo "ASC_KEY_ID_VALUE=$ASC_KEY_ID"
+            echo "ASC_ISSUER_ID_VALUE=$ASC_ISSUER_ID"
+            echo "ASC_TEAM_ID_VALUE=$ASC_TEAM_ID"
+          } >> "$GITHUB_ENV"
+          test -s "$RUNNER_TEMP/asc/AuthKey.p8"
+          echo "API key file staged at $RUNNER_TEMP/asc/AuthKey.p8 (mode 600)"
+
+      - name: Archive for App Store (automatic signing, iOS 26 SDK)
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild archive \
+            -project WineVault.xcodeproj \
+            -scheme "$SCHEME" \
+            -destination "generic/platform=iOS" \
+            -archivePath build/WineVault.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID_VALUE" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID_VALUE" \
+            DEVELOPMENT_TEAM="$ASC_TEAM_ID_VALUE" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            2>&1 | tee build/archive.log | xcbeautify
+          test -d build/WineVault.xcarchive
+          APP="build/WineVault.xcarchive/Products/Applications/WineVault.app"
+          BID=$(plutil -extract CFBundleIdentifier raw "$APP/Info.plist")
+          [ "$BID" = "$BUNDLE_ID" ] || { echo "Wrong bundle id in archive"; exit 1; }
+          codesign --verify --deep --strict "$APP"
+          echo "Archive verified (bundle id + signature)"
+
+      - name: Build export options plist
+        timeout-minutes: 1
+        env:
+          UPLOAD: ${{ inputs.upload != false }}
+        run: |
+          set -euo pipefail
+          python3 - "$UPLOAD" > build/ExportOptions.plist <<'PY'
+          import sys
+          upload = sys.argv[1] != "false"
+          body = """  <key>method</key>
+          <string>app-store-connect</string>
+          <key>signingStyle</key>
+          <string>automatic</string>
+          <key>manageAppVersionAndBuildNumber</key>
+          <false/>
+          <key>uploadSymbols</key>
+          <true/>
+          <key>teamID</key>
+          <string>__TEAM__</string>
+          """
+          if upload:
+              # Upload straight from export via the App Store Connect API key
+              # (the supported CLI path now that altool is gone from Xcode 26).
+              body += """  <key>destination</key>
+          <string>upload</string>
+          <key>uploadMethod</key>
+          <string>app-store-connect</string>
+          """
+          print("""<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          """ + body + """</dict>
+          </plist>""")
+          PY
+          sed -i '' "s/__TEAM__/$ASC_TEAM_ID_VALUE/" build/ExportOptions.plist
+          plutil -lint build/ExportOptions.plist
+
+      - name: Export + upload to TestFlight (App Store Connect API key)
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath build/WineVault.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID_VALUE" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID_VALUE" \
+            2>&1 | tee build/export.log | xcbeautify
+          ls -la build/export
+
+      - name: Generate changelog from merged PRs since last tag
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          bash Scripts/release_changelog.sh "$GITHUB_REF_NAME" > whats-new.md
+          echo "---- whats-new.md ----"
+          cat whats-new.md
+
+      - name: Await processed TestFlight build (App Store Connect API)
+        if: ${{ inputs.upload != false }}
+        timeout-minutes: 20
+        env:
+          WV_P8_PATH: ${{ runner.temp }}/asc/AuthKey.p8
+          WV_BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          pip3 install --quiet 'pyjwt[crypto]'
+          WV_KEY_ID="$ASC_KEY_ID_VALUE" WV_ISSUER_ID="$ASC_ISSUER_ID_VALUE" \
+          WV_BUNDLE_ID="$BUNDLE_ID" python3 - <<'PY'
+          import json, os, sys, time, urllib.request
+          import jwt
+
+          key = open(os.environ["WV_P8_PATH"]).read()
+
+          def auth():
+              now = int(time.time())
+              return jwt.encode(
+                  {"iss": os.environ["WV_ISSUER_ID"], "aud": "appstoreconnect-v1",
+                   "iat": now, "exp": now + 600},
+                  key, algorithm="ES256",
+                  headers={"kid": os.environ["WV_KEY_ID"]})
+
+          def api(path):
+              req = urllib.request.Request(
+                  "https://api.appstoreconnect.apple.com" + path,
+                  headers={"Authorization": "Bearer " + auth()})
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  return json.load(resp)
+
+          apps = api(f'/v1/apps?filter[bundleId]={os.environ["WV_BUNDLE_ID"]}')['data']
+          if not apps:
+              sys.exit("No App Store Connect app for the bundle id")
+          app_id = apps[0]["id"]
+          print(f"App Store Connect app record: {app_id}")
+
+          wanted = os.environ["WV_BUILD_NUMBER"]
+          deadline = time.time() + 15 * 60
+          while time.time() < deadline:
+              builds = api(f'/v1/builds?filter[app]={app_id}&sort=-uploadedDate&limit=15')['data']
+              match = next(
+                  (b for b in builds if b["attributes"].get("version") == wanted), None)
+              if match is None:
+                  time.sleep(30)
+                  continue
+              state = match["attributes"].get("processingState")
+              print(f"build id={match['id']} version={wanted} processing={state}")
+              if state == "PROCESSING":
+                  time.sleep(30)
+                  continue
+              if state == "COMPLETE":
+                  print(f"Processed TestFlight build id: {match['id']}")
+                  print(f"Build version: {wanted}")
+                  print(f"App Store Connect app id: {app_id}")
+                  sys.exit(0)
+              sys.exit(f"Unexpected processing state: {state}")
+          sys.exit("Timed out waiting for the build to appear/finish processing")
+          PY
+
+      - name: Retain release artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-export
+          path: |
+            build/export
+            whats-new.md
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Remove API key material
+        if: always()
+        timeout-minutes: 1
+        run: rm -rf "$RUNNER_TEMP/asc"
+
+  github-release:
+    name: GitHub release (tag pushes only)
+    needs: testflight
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download release export
+        uses: actions/download-artifact@v4
+        with:
+          name: release-export
+
+      - name: GitHub release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          args=(--title "Wine Vault $GITHUB_REF_NAME" --notes-file whats-new.md)
+          IPA=$(find . -name '*.ipa' -print -quit)
+          if [ -n "$IPA" ]; then
+            args+=("$IPA")
+          fi
+          gh release create "$GITHUB_REF_NAME" "${args[@]}"

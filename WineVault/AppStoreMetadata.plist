@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  App Store metadata draft for the v0.1.0 release (issue #7).
+  Single source of truth in code is WineVault/App/ReleaseInfo.swift;
+  ReleaseMetadataTests asserts this file matches it exactly, so a release
+  tool or App Store Connect entry can read either and get the same copy.
+-->
+<dict>
+	<key>Version</key>
+	<string>0.1.0</string>
+	<key>BundleID</key>
+	<string>com.infinityball.winevault</string>
+	<key>Name</key>
+	<string>Wine Vault</string>
+	<key>Subtitle</key>
+	<string>Local-first cellar inventory</string>
+	<key>PrimaryCategory</key>
+	<string>FOOD_AND_DRINK</string>
+	<key>SecondaryCategory</key>
+	<string>UTILITIES</string>
+	<key>PrivacyDeclaration</key>
+	<string>Data Not Collected</string>
+	<key>Keywords</key>
+	<string>wine,cellar,inventory,bottle,drink by,valuation,collector,offline</string>
+	<key>Description</key>
+	<string>Wine Vault is a local-first cellar inventory for your home wine collection. Track bottles, quantities, vintages, regions, grapes, storage locations, and drink-by notes — entirely on your iPhone.
+
+• Fully offline. Every record lives on your device. No account, no cloud database, no subscription.
+• Photos stay private. Optional label photos stay in the app's own storage and never leave your phone.
+• Value on demand. Opt-in price lookup returns dated reference quotes with their source — estimates with provenance, never authoritative prices; manual price entry always works offline.
+• Understand the collection. Drink-by timeline, dashboards by region and grape, and a value chart built only from your own stored quotes.
+• Your data, exportable. CSV export and ZIP backups — including photos — restore on a new device in one step.
+• No telemetry, no tracking, no data collected — confirmed by the app's own privacy manifest.</string>
+	<key>ScreenshotPlan</key>
+	<array>
+		<dict>
+			<key>Display</key>
+			<string>iPhone 6.9" (1320x2868)</string>
+			<key>PixelSize</key>
+			<string>1320x2868</string>
+			<key>Caption</key>
+			<string>Browse the whole cellar — bottles, vintages, and locations, fully offline.</string>
+		</dict>
+		<dict>
+			<key>Display</key>
+			<string>iPhone 6.9" (1320x2868)</string>
+			<key>PixelSize</key>
+			<string>1320x2868</string>
+			<key>Caption</key>
+			<string>Request a dated value estimate only when you want one; confirm matches yourself.</string>
+		</dict>
+		<dict>
+			<key>Display</key>
+			<string>iPhone 6.9" (1320x2868)</string>
+			<key>PixelSize</key>
+			<string>1320x2868</string>
+			<key>Caption</key>
+			<string>See what's ready to drink on the drink-by timeline.</string>
+		</dict>
+		<dict>
+			<key>Display</key>
+			<string>iPhone 6.9" (1320x2868)</string>
+			<key>PixelSize</key>
+			<string>1320x2868</string>
+			<key>Caption</key>
+			<string>Export CSV or a ZIP backup with photos and restore it on a new device.</string>
+		</dict>
+		<dict>
+			<key>Display</key>
+			<string>iPad 13" (2064x2752)</string>
+			<key>PixelSize</key>
+			<string>2064x2752</string>
+			<key>Caption</key>
+			<string>Two-column browsing on wide layouts — the same adaptive design on every device.</string>
+		</dict>
+	</array>
+</dict>
+</plist>
