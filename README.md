@@ -216,9 +216,12 @@ WineVault/                   App target
   App/                       Entry point
   Domain/ Data/ Services/    Layers (populated by later milestones)
   UI/                        SwiftUI views
+  AppStoreMetadata.plist     App Store copy draft (locked to ReleaseInfo.swift)
 WineVaultTests/              App-host unit tests
 WineVaultUITests/            Add/list/search/edit/delete + adaptive UI tests
+docs/RELEASE.md              TestFlight release process: cut, retry, rollback
 .github/workflows/ci.yml     Domain/Data (Linux) + coverage + lint + iOS 26 gate
+.github/workflows/release.yml TestFlight archive/upload on v* tags (ASC API)
 ```
 
 ## Local data architecture
