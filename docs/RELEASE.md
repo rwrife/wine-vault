@@ -60,9 +60,9 @@ pick it up in TestFlight (internal group by default).
 - **Signing identity:** no `.p12` is stored. `-allowProvisioningUpdates`
   with the ASC API key lets `xcodebuild` request/create the distribution
   certificate through Apple's automation for the team in `ASC_TEAM_ID`. The
-  hosted macOS runner's login keychain is used for the session; the workflow
-  also creates a dedicated `build.keychain` and only logs identity *counts*,
-  never names or key material.
+  hosted macOS runner's login keychain (pre-unlocked, codesigning partition
+  preconfigured) receives the generated key/certificate; the workflow only
+  logs identity *counts*, never names or key material.
 - **Profiles:** App Store provisioning profiles are created/updated
   automatically for `com.infinityball.winevault` (registered in App Store
   Connect); nothing is committed to the repo.

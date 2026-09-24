@@ -67,16 +67,18 @@ jobs:
           brew install xcodegen xcbeautify
           xcodegen generate
 
-      - name: Prepare ephemeral signing keychain
+      - name: Inspect default keychain signing identities (diagnostics)
         timeout-minutes: 2
         run: |
           set -euo pipefail
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-          security set-key-partition-list -S apple-tool:,apple:,codesigning: -s -k "" build.keychain
-          # Count only — identity names are never printed to logs.
-          security find-identity -v -p codesigning build.keychain \
+          # No custom keychain: GitHub-hosted macOS runners keep the login
+          # keychain unlocked with its codesigning partition preconfigured,
+          # and `xcodebuild -allowProvisioningUpdates` writes generated keys
+          # and certificates there. Creating an empty keychain as default
+          # would hide that setup (and `set-key-partition-list` fails with
+          # errSecItemNotFound on a keychain that has no items yet).
+          # Print identity COUNTS only — names are never logged.
+          { security find-identity -v -p codesigning || true; } \
             | awk '/valid identities found/{print "Available code-signing identities: " $1}'
 
       - name: Write App Store Connect API key (file only; contents never logged)
