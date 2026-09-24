@@ -1,0 +1,15 @@
+Keep your wine collection organized with Wine Vault. Record the bottles on your shelf and the details you want to remember about each one.
+
+YOUR COLLECTION AT A GLANCE
+Track wine names, producers, vintages, regions, grapes, quantities and storage locations. Search your collection and use tags and filters to find a bottle.
+
+REMEMBER THE DETAILS
+Keep notes with each bottle, attach a label photo, and record your own drink-by date. Browse the timeline to see the dates you have chosen.
+
+EXPLORE YOUR CELLAR
+View bottle counts by region and grape, review total quantities, and keep dated manual price entries. Value displays are estimates from recorded quotes, not live market prices or appraisals.
+
+BACK UP YOUR RECORDS
+Export a CSV inventory or a ZIP backup with label photos. Restore a saved backup through the app's merge or replace controls.
+
+Wine Vault keeps your inventory on your device. Your records and notes remain yours to manage and export.
