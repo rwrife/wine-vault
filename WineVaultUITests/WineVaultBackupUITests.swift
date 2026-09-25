@@ -88,7 +88,11 @@ final class WineVaultBackupUITests: XCTestCase {
         // bytes the real import path would stage.
         app.buttons["stageRestoreButton"].tap()
 
-        let replaceButton = app.buttons["restoreReplaceButton"]
+        // SwiftUI surfaces both the action-sheet button and its label copy
+        // with the same identifier, so target the unique option label.
+        let replaceButton = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "Replace everything")
+        ).firstMatch
         XCTAssertTrue(
             replaceButton.waitForExistence(timeout: 5),
             "Staging an archive must open the merge/replace chooser."
