@@ -78,6 +78,9 @@ jobs:
               done
             '
 
+      - name: Enforce Domain line coverage >= 90% (issue #8 gate)
+        run: python3 Scripts/check_coverage_threshold.py coverage/domain.lcov 90
+
       - name: Archive actual package coverage on pull requests
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
