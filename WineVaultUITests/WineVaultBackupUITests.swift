@@ -73,6 +73,42 @@ final class WineVaultBackupUITests: XCTestCase {
     }
 
     @MainActor
+    func testRestoreHappyPathReportsAppliedSummary() {
+        app = XCUIApplication()
+        app.launchArguments = [
+            "--ui-testing",
+            "--ui-testing-seed=wine-vault",
+            "--ui-testing-restore-file",
+        ]
+        app.launch()
+        app.buttons["settingsButton"].tap()
+
+        // The document picker cannot be driven from XCUITest, so the app
+        // exposes a gated staging button that pre-seeds the same archive
+        // bytes the real import path would stage.
+        app.buttons["stageRestoreButton"].tap()
+
+        let replaceButton = app.buttons["restoreReplaceButton"]
+        XCTAssertTrue(
+            replaceButton.waitForExistence(timeout: 5),
+            "Staging an archive must open the merge/replace chooser."
+        )
+        replaceButton.tap()
+
+        let message = app.staticTexts["backupMessage"]
+        XCTAssertTrue(
+            message.waitForExistence(timeout: 10),
+            "A completed restore must report its applied summary."
+        )
+        XCTAssertTrue(
+            message.label.localizedCaseInsensitiveContains("Restored"),
+            "Restore message should summarize applied records, got: \(message.label)"
+        )
+
+        app.buttons["settingsDoneButton"].tap()
+    }
+
+    @MainActor
     func testExportCSVHappyPathReportsRowCount() {
         launchSeededApp()
         app.buttons["settingsButton"].tap()

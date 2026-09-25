@@ -78,6 +78,17 @@ struct SettingsView: View {
                 .accessibilityIdentifier("restoreBackupButton")
                 .disabled(!store.isBackupAvailable || store.isExporting)
 
+                if ProcessInfo.processInfo.arguments.contains("--ui-testing-restore-file") {
+                    // UI-test seam: the system document picker cannot be
+                    // driven from XCUITest, so this stages exactly what the
+                    // fileImporter callback would stage, then opens the
+                    // same strategy chooser the real import path opens.
+                    Button("Stage restore file (UI test)") {
+                        stageRestoreArchiveForUITest()
+                    }
+                    .accessibilityIdentifier("stageRestoreButton")
+                }
+
                 if let message = store.backupMessage {
                     Text(message)
                         .font(.footnote)
@@ -208,6 +219,25 @@ struct SettingsView: View {
                     + "Either way, a failed restore leaves your current data intact."
             )
         }
+    }
+
+    /// UI-test seam: writes an inert marker archive (the same bytes
+    /// `InertBackupService` accepts) to a temporary file, pre-seeding the
+    /// restore flow exactly as the fileImporter callback would.
+    private func stageRestoreArchiveForUITest() {
+        let staged = FileManager.default.temporaryDirectory
+            .appendingPathComponent("restore-\(UUID().uuidString).zip")
+        var payload = InertBackupService.uiTestArchiveMarker
+        payload.append(Data("uitest".utf8))
+        do {
+            try payload.write(to: staged, options: .atomic)
+        } catch {
+            restoreImportError = "That backup file could not be read."
+            return
+        }
+        pendingRestoreURL = staged
+        restoreImportError = nil
+        showingStrategyChooser = true
     }
 
     private func startPendingRestore(strategy: BackupRestoreStrategy) {

@@ -38,7 +38,8 @@ struct InertBackupService: BackupServicing {
     }
 
     private static let store = Store()
-    private static let marker = Data("inert-backup".utf8)
+    nonisolated static let uiTestArchiveMarker = Data("inert-backup".utf8)
+    private static let marker = uiTestArchiveMarker
 
     func createBackup(appVersion: String) async throws -> VaultBackupBundle {
         let stamp = WineVaultDataStack.dayStamp(for: Date())

@@ -202,6 +202,8 @@ open WineVault.xcodeproj     # scheme: WineVault
   verifies an `SF` entry for every package source file.
 - Native CI keeps build/test result bundles, raw logs, and bounded simulator
   diagnostics for 14 days, including failures.
+- Full testing guide — running every gate locally, adding fixtures, and the
+  flaky-test/quarantine policy: [docs/TESTING.md](docs/TESTING.md).
 - Lint: `swiftlint --strict --config .swiftlint.yml Packages/WineVaultDomain Packages/WineVaultData`
 - Release path: GitHub Actions → App Store Connect API (secrets above) →
   TestFlight. See PLAN.md.
